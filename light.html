@@ -367,7 +367,6 @@ function renderCard(){
     <div><b class="${toParCls(s.toPar)}">${toParTxt(s.toPar)}</b><span>To par</span></div>
     <div><b>${fmt(s.net)}</b><span>Net</span></div>
   </div>
-  <p class="tip">Tap a hole and type ${esc(p.name)}'s score. It saves straight away and shows on everyone's phone.</p>
   ${strip(0,9,"Out","Out")}${strip(9,18,"In","In")}
   <div class="nine"><h3>Front nine</h3>${[0,1,2,3,4,5,6,7,8].map(holeRow).join("")}
     <div class="subt"><span>Out (par 36)</span><b>${has(0,9)?out:"–"}</b></div></div>
