@@ -254,7 +254,7 @@ const COURSE={name:"Palmer Colonial",tees:"White tees",holes:[
  [484,5,"Longest hole on the course. Three shots, no heroics."],
  [320,4,"Short closing par 4. Finish with a fairway and a wedge."]
 ]};
-const CTP=15; /* closest-to-the-pin hole, 0-based: hole 16, the last par 3 */
+const CTP=-1; /* closest-to-the-pin hole, 0-based (e.g. 15 = hole 16); -1 = off, the course runs it on the day */
 const PAR=COURSE.holes.map(h=>h[1]), TOTAL_PAR=PAR.reduce((a,b)=>a+b,0);
 /* WDDE Club logo — same artwork as the Cup Day form guide */
 const LOGO=`<svg class="logo" viewBox="0 0 300 200" role="img" aria-label="WDDE Club logo">
@@ -335,7 +335,6 @@ function renderBoard(){
   <header>
     <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“The greens break both ways”</p></div></div>
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a></div>
-    <p class="ctpnote"><span class="flagic">⛳</span> Closest to the pin: hole ${CTP+1} (par 3, ${COURSE.holes[CTP][0]} m)</p>
     <p>Lowest net wins. Net is your score against par after handicap, with your handicap shared across the holes you've played. Tap a player to see or enter his card.</p>
   </header>
   <section class="board" aria-label="Leaderboard">
