@@ -21,7 +21,7 @@ header{padding-block:20px 12px;display:grid;gap:2px}
 h1{font-family:var(--f-display);font-weight:900;font-size:2.3rem;line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
 h2{font-family:var(--f-display);font-weight:700;font-size:1.25rem;margin:0;letter-spacing:.06em;text-transform:uppercase}
 header p{margin:4px 0 0;color:var(--muted);font-size:.88rem}
-.brand{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:10px;padding-right:44px}
 .brand>div{display:grid;gap:2px;min-width:0}
 header .sub{color:var(--muted)}
 .brand h1{font-size:clamp(1.7rem,7.5vw,2.4rem);line-height:.95}
@@ -109,6 +109,12 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .x.confirm{color:var(--bg);background:var(--red);border-color:var(--red);padding:0 10px;font-size:.8rem;font-weight:600}
 .add{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:4px}
 @media (prefers-reduced-motion:reduce){tr.moved{animation:none}}
+.mode{position:absolute;top:14px;right:0;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);color:var(--muted);background:var(--board)}
+header{position:relative}
+.nmw{display:flex;align-items:center;gap:8px;min-width:0}
+.av{flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid var(--flag);background:var(--row);display:inline-grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:.85rem;letter-spacing:.02em;color:var(--flag);overflow:hidden}
+.av.lg{width:52px;height:52px;font-size:1.3rem;border-width:2.5px}
+.bar .av.lg{margin-left:2px}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -254,6 +260,12 @@ const LOGO=`<svg class="logo" viewBox="0 0 300 200" role="img" aria-label="WDDE 
   <text class="txt" x="150" y="128" text-anchor="middle" font-size="58" textLength="238" lengthAdjust="spacingAndGlyphs">WDDE Club</text>
 </svg>`;
 
+/* Player headshots: drop a square photo at faces/<player id>.jpg and list the id here. No photo = initials badge. */
+const FACES={};
+function avatar(p,cls=""){
+  const ini=esc((p.name||"?").replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?");
+  return FACES[p.id]?`<img class="av ${cls}" src="faces/${p.id}.jpg?v=${FACES[p.id]}" alt="">`:`<span class="av ${cls}" aria-hidden="true">${ini}</span>`;
+}
 let state=loadLocal();
 let view={name:"board",id:null,edit:false}, prevOrder=[];
 const $=id=>document.getElementById(id);
@@ -290,6 +302,7 @@ function renderBoard(){
   const all=scored.concat(rest), order=all.map(x=>x.p.id);
   $("app").innerHTML=`
   <header>
+    <a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a>
     <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">(the greens run both ways)</p></div></div>
     <span class="eyebrow sub">${COURSE.name} · ${COURSE.tees} · Par ${TOTAL_PAR}</span>
     <p>Net wins. Net = gross minus handicap. Tap a player to see or enter his card.</p>
@@ -302,7 +315,7 @@ function renderBoard(){
         const empty=x.gross==null, lead=!empty&&x.pos===1, moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
         return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${moved?"moved":""}" data-open="${x.p.id}" tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
           <td class="pos">${empty?"–":x.label}</td>
-          <td class="nm">${esc(x.p.name||"(no name)")}<span class="chev">›</span></td>
+          <td class="nm"><span class="nmw">${avatar(x.p)}<span>${esc(x.p.name||"(no name)")}<span class="chev">›</span></span></span></td>
           <td class="thru">${x.thru===18?"F":x.thru||"–"}</td>
           <td><span class="${toParCls(x.toPar)}">${fmt(x.gross)}</span></td>
           <td>${x.p.hcp==null?"–":fmt(x.p.hcp)}</td>
@@ -328,7 +341,7 @@ function renderCard(){
       <input id="s-${p.id}-${i}" data-hole="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
-    <div class="ttl"><h2>${esc(p.name||"(no name)")}</h2><small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>
+    ${avatar(p,"lg")}<div class="ttl"><h2>${esc(p.name||"(no name)")}</h2><small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>
   <div class="sum">
     <div><b>${s.thru===18?"F":s.thru}</b><span>Thru</span></div>
     <div><b>${fmt(s.gross)}</b><span>Gross</span></div>
