@@ -358,7 +358,7 @@ function renderBoard(){
           <td>${x.p.hcp==null?"–":fmt(x.p.hcp)}</td>
           <td class="net"><span class="${toParCls(x.net)}">${toParTxt(x.net)}</span></td></tr>`}).join("")}</tbody>
     </table>
-    <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.<br><b class="sync ${MODE}">${syncNote}</b></div>
+    <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
   </section>
   <div class="links"><button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>`;
   prevOrder=order;
