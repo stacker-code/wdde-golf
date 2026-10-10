@@ -126,7 +126,7 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .bar .av.lg{margin-left:2px}
 .form{margin:0 0 14px;padding:10px 12px;border-left:3px solid var(--flag);background:var(--board);border-radius:8px;font-style:italic;font-size:.95rem;color:var(--cream)}
 .form b{display:block;font-style:normal;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--flag);margin-bottom:2px}
-.hole .info b .shot{color:var(--green);font-weight:600}
+.hole .info b .shot{color:var(--green);font-weight:600;white-space:nowrap}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -366,7 +366,7 @@ function renderBoard(){
   <header>
     <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“The greens break both ways”</p></div></div>
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a></div>
-    <p>Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index), like a normal card. Tap a player to see or enter his card.</p>
+    <p>Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index, "SI" on each hole), like a normal card. Tap a player to see or enter his card.</p>
   </header>
   <section class="board" aria-label="Leaderboard">
     <div class="board-head"><h2>Leaderboard</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${state.players.length} started</span></div>
@@ -398,7 +398,7 @@ function renderCard(){
       ${stripRow(f,t,"Score")}</tbody></table></div>`;
   const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole${i===CTP?" ctp":""}" id="hole-${i}">
       <span class="no">${i+1}</span>
-      <span class="info"><b>Par ${h[1]} · ${h[0]} m · Index ${SI[i]}${(n=>n>0?` <span class="shot">+${n} shot${n>1?"s":""}</span>`:"")(shots(p.hcp,i))}</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
+      <span class="info"><b>Par ${h[1]} · ${h[0]} m · SI ${SI[i]}${(n=>n>0?` <span class="shot">+${n} shot${n>1?"s":""}</span>`:"")(shots(p.hcp,i))}</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
       <input id="s-${p.id}-${i}" data-hole="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
