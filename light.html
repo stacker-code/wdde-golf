@@ -322,7 +322,7 @@ function renderBoard(){
   $("app").innerHTML=`
   <header>
     <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“The greens run both ways”</p></div></div>
-    <div class="course"><span class="eyebrow sub">${COURSE.name} · ${COURSE.tees} · Par ${TOTAL_PAR}</span><a class="mode" href="./" aria-label="Switch to the dark version" title="Switch to the dark version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg></a></div>
+    <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="./" aria-label="Switch to the dark version" title="Switch to the dark version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg></a></div>
     <p class="ctpnote"><span class="flagic">⛳</span> Closest to the pin: hole ${CTP+1} (par 3, ${COURSE.holes[CTP][0]} m)</p>
     <p>Net wins. Net = gross minus handicap. Tap a player to see or enter his card.</p>
   </header>
