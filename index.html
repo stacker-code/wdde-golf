@@ -366,7 +366,7 @@ function renderBoard(){
   const all=scored.concat(rest), order=all.map(x=>x.p.id);
   $("app").innerHTML=`
   <header>
-    <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“The greens break both ways”</p></div></div>
+    <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“Where the greens break both ways”</p></div></div>
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a></div>
     <p>Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index, "SI" on each hole), like a normal card. Tap a player to see or enter his card.</p>
   </header>
