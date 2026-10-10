@@ -21,12 +21,12 @@ header{padding-block:20px 12px;display:grid;gap:2px}
 h1{font-family:var(--f-display);font-weight:900;font-size:2.3rem;line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
 h2{font-family:var(--f-display);font-weight:700;font-size:1.25rem;margin:0;letter-spacing:.06em;text-transform:uppercase}
 header p{margin:4px 0 0;color:var(--muted);font-size:.88rem}
-.brand{display:flex;align-items:center;gap:14px;margin-bottom:10px;padding-right:44px}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .brand>div{display:grid;gap:2px;min-width:0}
 header .sub{color:var(--muted)}
-.brand h1{font-size:clamp(1.7rem,7.5vw,2.4rem);line-height:.95}
+.brand h1{font-size:clamp(1.15rem,5.9vw,2.05rem);line-height:1;white-space:nowrap}
 header .tagline{margin:4px 0 0;font-style:italic;color:var(--flag);font-size:clamp(.9rem,3.6vw,1.05rem)}
-.logo{width:clamp(96px,26vw,128px);height:auto;flex:none;display:block}
+.logo{width:clamp(68px,19vw,104px);height:auto;flex:none;display:block}
 .logo .fig{fill:var(--cream)}
 .logo .gap{fill:var(--bg)}
 .logo .txt{fill:var(--bg);font-family:var(--f-display);font-weight:900}
@@ -49,6 +49,15 @@ button:focus-visible,input:focus-visible,.lbrow:focus-visible{outline:2px solid 
 .lbrow:active{background:var(--row)}
 tr.lead td.pos{color:var(--bg);background:var(--flag)}
 tr.lead td.net{color:var(--flag)}
+tr.p2 td.pos{color:#0b1a14;background:#c7d0d4}
+tr.p3 td.pos{color:#0b1a14;background:#c98d5a}
+td.pos .mv{display:block;font-size:.62rem;line-height:1.1;margin-top:2px;font-weight:600}
+td.pos .mv.up{color:var(--green)} td.pos .mv.dn{color:var(--red)}
+tr.lead td.pos .mv,tr.p2 td.pos .mv,tr.p3 td.pos .mv{color:#0b1a14}
+header p.ctpnote{margin:8px 0 0;display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:5px 10px;border-radius:999px;border:1px solid var(--flag);color:var(--flag);font-size:.82rem;font-weight:600}
+.hole.ctp{border-color:var(--flag);box-shadow:inset 3px 0 0 var(--flag)}
+.hole .ctpb{display:inline-block;margin-top:2px;font-size:.72rem;font-weight:600;color:var(--flag);text-transform:uppercase;letter-spacing:.06em}
+.strip th.ctp{color:var(--flag);background:color-mix(in srgb,var(--flag) 18%,var(--board))}
 tr.empty td{color:var(--muted)} tr.empty td.nm{color:var(--muted);font-weight:500}
 tr.moved{animation:flash 1.2s ease-out}
 @keyframes flash{from{background:color-mix(in srgb,var(--flag) 25%,transparent)}to{background:transparent}}
@@ -109,8 +118,8 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .x.confirm{color:var(--bg);background:var(--red);border-color:var(--red);padding:0 10px;font-size:.8rem;font-weight:600}
 .add{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:4px}
 @media (prefers-reduced-motion:reduce){tr.moved{animation:none}}
-.mode{position:absolute;top:14px;right:0;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);color:var(--muted);background:var(--board)}
-header{position:relative}
+.course{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mode{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);color:var(--muted);background:var(--board)}
 .nmw{display:flex;align-items:center;gap:8px;min-width:0}
 .av{flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid var(--flag);background:var(--row);display:inline-grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:.85rem;letter-spacing:.02em;color:var(--flag);overflow:hidden}
 .av.lg{width:52px;height:52px;font-size:1.3rem;border-width:2.5px}
@@ -243,6 +252,7 @@ const COURSE={name:"Palmer Colonial",tees:"White tees",holes:[
  [484,5,"Longest hole on the course. Three shots, no heroics."],
  [320,4,"Short closing par 4. Finish with a fairway and a wedge."]
 ]};
+const CTP=15; /* closest-to-the-pin hole, 0-based: hole 16, the last par 3 */
 const PAR=COURSE.holes.map(h=>h[1]), TOTAL_PAR=PAR.reduce((a,b)=>a+b,0);
 /* WDDE Club logo — same artwork as the Cup Day form guide */
 const LOGO=`<svg class="logo" viewBox="0 0 300 200" role="img" aria-label="WDDE Club logo">
@@ -267,6 +277,7 @@ function avatar(p,cls=""){
   return FACES[p.id]?`<img class="av ${cls}" src="faces/${p.id}.jpg?v=${FACES[p.id]}" alt="">`:`<span class="av ${cls}" aria-hidden="true">${ini}</span>`;
 }
 let state=loadLocal();
+const posMemo={}; /* id -> {pos, mv}: places moved at the last change in standings this visit */
 let view={name:"board",id:null,edit:false}, prevOrder=[];
 const $=id=>document.getElementById(id);
 const num=v=>{if(v===""||v==null)return null;const n=parseInt(v,10);return isNaN(n)||n<1?null:Math.min(n,20)};
@@ -299,12 +310,13 @@ function renderBoard(){
   const rest=list.filter(x=>x.gross==null).sort((a,b)=>a.p.name.localeCompare(b.p.name,"en",{sensitivity:"base"}));
   let pos=0,last=null;scored.forEach((x,i)=>{if(x.net!==last){pos=i+1;last=x.net}x.pos=pos});
   scored.forEach(x=>x.label=(scored.filter(y=>y.pos===x.pos).length>1?"T":"")+x.pos);
+  scored.forEach(x=>{const m=posMemo[x.p.id];if(m&&m.pos!==x.pos)m.mv=m.pos-x.pos;posMemo[x.p.id]={pos:x.pos,mv:m?m.mv:0}});
   const all=scored.concat(rest), order=all.map(x=>x.p.id);
   $("app").innerHTML=`
   <header>
-    <a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a>
-    <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">(the greens run both ways)</p></div></div>
-    <span class="eyebrow sub">${COURSE.name} · ${COURSE.tees} · Par ${TOTAL_PAR}</span>
+    <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“The greens run both ways”</p></div></div>
+    <div class="course"><span class="eyebrow sub">${COURSE.name} · ${COURSE.tees} · Par ${TOTAL_PAR}</span><a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a></div>
+    <p class="ctpnote"><span class="flagic">⛳</span> Closest to the pin: hole ${CTP+1} (par 3, ${COURSE.holes[CTP][0]} m)</p>
     <p>Net wins. Net = gross minus handicap. Tap a player to see or enter his card.</p>
   </header>
   <section class="board" aria-label="Leaderboard">
@@ -312,9 +324,9 @@ function renderBoard(){
     <table class="tbl">
       <thead><tr><th>Pos</th><th>Player</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>Net</th></tr></thead>
       <tbody>${all.map((x,i)=>{
-        const empty=x.gross==null, lead=!empty&&x.pos===1, moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
-        return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${moved?"moved":""}" data-open="${x.p.id}" tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
-          <td class="pos">${empty?"–":x.label}</td>
+        const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty?0:(posMemo[x.p.id]||{}).mv||0, moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
+        return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" data-open="${x.p.id}" tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
+          <td class="pos">${empty?"–":x.label}${mv>0?`<span class="mv up" aria-label="up ${mv}">▲${mv}</span>`:mv<0?`<span class="mv dn" aria-label="down ${-mv}">▼${-mv}</span>`:""}</td>
           <td class="nm"><span class="nmw">${avatar(x.p)}<span>${esc(x.p.name||"(no name)")}<span class="chev">›</span></span></span></td>
           <td class="thru">${x.thru===18?"F":x.thru||"–"}</td>
           <td><span class="${toParCls(x.toPar)}">${fmt(x.gross)}</span></td>
@@ -332,12 +344,12 @@ function renderCard(){
   const has=(f,t)=>p.holes.slice(f,t).some(v=>v!=null);
   const stripRow=(f,t,label)=>`<tr><td>${label}</td>${COURSE.holes.slice(f,t).map((h,i)=>`<td class="s" data-jump="${f+i}">${mark(p.holes[f+i],h[1])||"·"}</td>`).join("")}<td class="tot">${has(f,t)?sum(p.holes,f,t):"–"}</td></tr>`;
   const strip=(f,t,lab,totLab)=>`<div class="strip-wrap"><table class="strip">
-      <thead><tr><th>${lab}</th>${COURSE.holes.slice(f,t).map((h,i)=>`<th>${f+i+1}</th>`).join("")}<th>${totLab}</th></tr></thead>
+      <thead><tr><th>${lab}</th>${COURSE.holes.slice(f,t).map((h,i)=>`<th${f+i===CTP?' class="ctp" title="Closest to the pin"':""}>${f+i+1}</th>`).join("")}<th>${totLab}</th></tr></thead>
       <tbody><tr><td>Par</td>${COURSE.holes.slice(f,t).map(h=>`<td>${h[1]}</td>`).join("")}<td class="tot">${PAR.slice(f,t).reduce((a,b)=>a+b,0)}</td></tr>
       ${stripRow(f,t,"Score")}</tbody></table></div>`;
-  const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole" id="hole-${i}">
+  const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole${i===CTP?" ctp":""}" id="hole-${i}">
       <span class="no">${i+1}</span>
-      <span class="info"><b>Par ${h[1]} · ${h[0]} m</b><span>${h[2]}</span></span>
+      <span class="info"><b>Par ${h[1]} · ${h[0]} m</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
       <input id="s-${p.id}-${i}" data-hole="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
