@@ -277,7 +277,9 @@ function avatar(p,cls=""){
   return FACES[p.id]?`<img class="av ${cls}" src="faces/${p.id}.jpg?v=${FACES[p.id]}" alt="">`:`<span class="av ${cls}" aria-hidden="true">${ini}</span>`;
 }
 let state=loadLocal();
-const posMemo={}; /* id -> {pos, mv}: places moved at the last change in standings this visit */
+const posMemo={}; /* id -> {pos, mv, at}: places moved at the last change in standings; shown for MOVE_MS */
+const MOVE_MS=120000;
+setInterval(()=>{if(view.name==="board"&&Object.values(posMemo).some(m=>m.mv&&Date.now()-m.at>=MOVE_MS&&!m.gone)){Object.values(posMemo).forEach(m=>{if(m.mv&&Date.now()-m.at>=MOVE_MS)m.gone=true});rerender()}},10000);
 let view={name:"board",id:null,edit:false}, prevOrder=[];
 const $=id=>document.getElementById(id);
 const num=v=>{if(v===""||v==null)return null;const n=parseInt(v,10);return isNaN(n)||n<1?null:Math.min(n,20)};
@@ -289,7 +291,9 @@ function stats(p){
   const played=p.holes.map((v,i)=>v!=null?i:-1).filter(i=>i>=0);
   const gross=played.length?sum(p.holes,0,18):null;
   const parPlayed=played.reduce((s,i)=>s+PAR[i],0);
-  return{thru:played.length,gross,toPar:gross==null?null:gross-parPlayed,net:gross==null?null:gross-(p.hcp||0)};
+  /* Net to par: handicap is shared evenly across the holes played (full handicap after 18), so players are comparable mid-round. */
+  const netExact=gross==null?null:gross-parPlayed-(p.hcp||0)*played.length/18;
+  return{thru:played.length,gross,toPar:gross==null?null:gross-parPlayed,netExact,net:netExact==null?null:Math.round(netExact)};
 }
 const toParTxt=n=>n==null?"–":n===0?"E":(n>0?"+"+n:String(n));
 const toParCls=n=>n==null||n===0?"":n<0?"under":"over";
@@ -306,32 +310,32 @@ function render(){
 }
 function renderBoard(){
   const list=state.players.map(p=>Object.assign({p},stats(p)));
-  const scored=list.filter(x=>x.gross!=null).sort((a,b)=>a.net-b.net||b.thru-a.thru||a.gross-b.gross);
+  const scored=list.filter(x=>x.gross!=null).sort((a,b)=>a.net-b.net||a.netExact-b.netExact||b.thru-a.thru);
   const rest=list.filter(x=>x.gross==null).sort((a,b)=>a.p.name.localeCompare(b.p.name,"en",{sensitivity:"base"}));
   let pos=0,last=null;scored.forEach((x,i)=>{if(x.net!==last){pos=i+1;last=x.net}x.pos=pos});
   scored.forEach(x=>x.label=(scored.filter(y=>y.pos===x.pos).length>1?"T":"")+x.pos);
-  scored.forEach(x=>{const m=posMemo[x.p.id];if(m&&m.pos!==x.pos)m.mv=m.pos-x.pos;posMemo[x.p.id]={pos:x.pos,mv:m?m.mv:0}});
+  scored.forEach(x=>{const m=posMemo[x.p.id];posMemo[x.p.id]=m&&m.pos!==x.pos?{pos:x.pos,mv:m.pos-x.pos,at:Date.now()}:m?Object.assign(m,{pos:x.pos}):{pos:x.pos,mv:0,at:0}});
   const all=scored.concat(rest), order=all.map(x=>x.p.id);
   $("app").innerHTML=`
   <header>
     <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“The greens run both ways”</p></div></div>
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a></div>
     <p class="ctpnote"><span class="flagic">⛳</span> Closest to the pin: hole ${CTP+1} (par 3, ${COURSE.holes[CTP][0]} m)</p>
-    <p>Net wins. Net = gross minus handicap. Tap a player to see or enter his card.</p>
+    <p>Lowest net wins. Net is your score against par after handicap, with your handicap shared across the holes you've played. Tap a player to see or enter his card.</p>
   </header>
   <section class="board" aria-label="Leaderboard">
     <div class="board-head"><h2>Leaderboard</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${state.players.length} started</span></div>
     <table class="tbl">
       <thead><tr><th>Pos</th><th>Player</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>Net</th></tr></thead>
       <tbody>${all.map((x,i)=>{
-        const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty?0:(posMemo[x.p.id]||{}).mv||0, moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
+        const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty?0:(m=>m&&m.mv&&Date.now()-m.at<MOVE_MS?m.mv:0)(posMemo[x.p.id]), moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
         return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" data-open="${x.p.id}" tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
           <td class="pos">${empty?"–":x.label}${mv>0?`<span class="mv up" aria-label="up ${mv}">▲${mv}</span>`:mv<0?`<span class="mv dn" aria-label="down ${-mv}">▼${-mv}</span>`:""}</td>
           <td class="nm"><span class="nmw">${avatar(x.p)}<span>${esc(x.p.name||"(no name)")}<span class="chev">›</span></span></span></td>
           <td class="thru">${x.thru===18?"F":x.thru||"–"}</td>
           <td><span class="${toParCls(x.toPar)}">${fmt(x.gross)}</span></td>
           <td>${x.p.hcp==null?"–":fmt(x.p.hcp)}</td>
-          <td class="net">${fmt(x.net)}</td></tr>`}).join("")}</tbody>
+          <td class="net"><span class="${toParCls(x.net)}">${toParTxt(x.net)}</span></td></tr>`}).join("")}</tbody>
     </table>
     <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.<br><b class="sync ${MODE}">${syncNote}</b></div>
   </section>
@@ -358,7 +362,7 @@ function renderCard(){
     <div><b>${s.thru===18?"F":s.thru}</b><span>Thru</span></div>
     <div><b>${fmt(s.gross)}</b><span>Gross</span></div>
     <div><b class="${toParCls(s.toPar)}">${toParTxt(s.toPar)}</b><span>To par</span></div>
-    <div><b>${fmt(s.net)}</b><span>Net</span></div>
+    <div><b class="${toParCls(s.net)}">${toParTxt(s.net)}</b><span>Net</span></div>
   </div>
   ${strip(0,9,"Out","Out")}${strip(9,18,"In","In")}
   <div class="nine"><h3>Front nine</h3>${[0,1,2,3,4,5,6,7,8].map(holeRow).join("")}
