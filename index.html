@@ -203,18 +203,37 @@ function applyPlayerEvent(ev){
 }
 const timers={};
 function debounce(key,fn,ms=400){clearTimeout(timers[key]);timers[key]=setTimeout(fn,ms)}
+/* Writes retry until they land (patchy signal on the course). A newer edit to the same box replaces an older pending one. */
+const pending={};
+const LIVE_NOTE="Live: scores sync across everyone's phones.";
+function persist(key,meta,op){
+  const ver=(pending[key]?pending[key].ver:0)+1; pending[key]=Object.assign({ver},meta);
+  (async()=>{
+    for(;;){
+      if(!pending[key]||pending[key].ver!==ver)return;
+      let error=null; try{({error}=await op())}catch(e){error=e}
+      if(!error){
+        if(pending[key]&&pending[key].ver===ver)delete pending[key];
+        if(!Object.keys(pending).length&&!syncNote.startsWith("Live")){syncNote=LIVE_NOTE;rerender()}
+        return;
+      }
+      syncNote="No signal? Your scores are kept on this phone and will send by themselves.";rerender();
+      await new Promise(r=>setTimeout(r,4000));
+    }
+  })();
+}
 function warn(e){if(e){syncNote="Last change didn't reach the live board. Check signal and try again.";rerender()}}
 function savePlayer(p){
   if(MODE!=="live")return saveLocal();
-  debounce("p"+p.id,async()=>{const{error}=await SB.from("players").upsert({id:p.id,name:p.name,hcp:p.hcp,sort:p.sort||0});warn(error)});
+  debounce("p"+p.id,()=>persist("p"+p.id,{},()=>SB.from("players").upsert({id:p.id,name:p.name,hcp:p.hcp,sort:p.sort||0})));
 }
 function saveHole(p,i){
   if(MODE!=="live")return saveLocal();
-  debounce("h"+p.id+i,async()=>{
+  debounce("h"+p.id+i,()=>persist("h"+p.id+"-"+i,{pid:p.id,i,get v(){return p.holes[i]}},()=>{
     const v=p.holes[i];
-    const{error}=v==null?await SB.from("scores").delete().match({player_id:p.id,hole:i+1})
-      :await SB.from("scores").upsert({player_id:p.id,hole:i+1,strokes:v});
-    warn(error)},250);
+    return v==null?SB.from("scores").delete().match({player_id:p.id,hole:i+1})
+      :SB.from("scores").upsert({player_id:p.id,hole:i+1,strokes:v});
+  }),250);
 }
 async function addPlayer(p){
   p.sort=Math.max(0,...state.players.map(x=>x.sort||0))+1;
@@ -230,7 +249,10 @@ async function clearAllScores(){
   if(MODE!=="live")return saveLocal();
   const{error}=await SB.from("scores").delete().gte("hole",1);warn(error);
 }
-function onRemoteChange(newState){state=newState;rerender()}
+function onRemoteChange(newState){
+  /* keep scores this phone hasn't managed to send yet */
+  Object.values(pending).forEach(m=>{if(m.pid==null)return;const p=newState.players.find(x=>x.id===m.pid);if(p)p.holes[m.i]=m.v});
+  state=newState;rerender()}
 /* ======================= end STORE ======================= */
 
 /* Palmer Colonial — white tees, par 72, 5,774 m */
