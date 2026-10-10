@@ -124,6 +124,8 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .av{flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid var(--flag);background:var(--row);display:inline-grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:.85rem;letter-spacing:.02em;color:var(--flag);overflow:hidden}
 .av.lg{width:52px;height:52px;font-size:1.3rem;border-width:2.5px}
 .bar .av.lg{margin-left:2px}
+.form{margin:0 0 14px;padding:10px 12px;border-left:3px solid var(--flag);background:var(--board);border-radius:8px;font-style:italic;font-size:.95rem;color:var(--cream)}
+.form b{display:block;font-style:normal;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--flag);margin-bottom:2px}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -271,6 +273,18 @@ const LOGO=`<svg class="logo" viewBox="0 0 300 200" role="img" aria-label="WDDE 
 </svg>`;
 
 /* Player headshots: drop a square photo at faces/<player id>.jpg and list the id here. No photo = initials badge. */
+/* Form guide blurbs shown on each player's card (from Steve). */
+const BIOS={
+  p1:"Mostly here for the piss.",
+  p2:"Likes the trees & wet. Expect him out wide.",
+  p3:"The deserved top seed in this field of shit.",
+  p4:"Will be \"pushing up\" the leaderboard as best he can.",
+  p5:"Sponsored by Just For Men. We'll see if the golf is as good as the hair.",
+  p6:"A NSW supporter, so can handle disappointment.",
+  p7:"No supercomputer, he may struggle.",
+  p9:"A strong contender as long as he stays away from the rum & sars.",
+  p10:"Surprisingly, often at the top of the leaderboard."
+};
 const FACES={p1:2,p2:1,p3:1,p4:2,p5:1,p6:1,p7:1,p8:1,p9:1,p10:1};
 function avatar(p,cls=""){
   const ini=esc((p.name||"?").replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?");
@@ -364,6 +378,7 @@ function renderCard(){
     <div><b class="${toParCls(s.toPar)}">${toParTxt(s.toPar)}</b><span>To par</span></div>
     <div><b class="${toParCls(s.net)}">${toParTxt(s.net)}</b><span>Net</span></div>
   </div>
+  ${BIOS[p.id]?`<p class="form"><b>Form guide</b>${esc(BIOS[p.id])}</p>`:""}
   ${strip(0,9,"Out","Out")}${strip(9,18,"In","In")}
   <div class="nine"><h3>Front nine</h3>${[0,1,2,3,4,5,6,7,8].map(holeRow).join("")}
     <div class="subt"><span>Out (par 36)</span><b>${has(0,9)?out:"–"}</b></div></div>
