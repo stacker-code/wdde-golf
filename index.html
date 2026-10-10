@@ -25,7 +25,7 @@ header p{margin:4px 0 0;color:var(--muted);font-size:.88rem}
 .brand>div{display:grid;gap:2px;min-width:0}
 header .sub{color:var(--muted)}
 .brand h1{font-size:clamp(1.15rem,5.9vw,2.05rem);line-height:1;white-space:nowrap}
-header .tagline{margin:4px 0 0;font-style:italic;color:var(--flag);font-size:clamp(.9rem,3.6vw,1.05rem)}
+header .tagline{text-align:center;margin:4px 0 0;font-style:italic;color:var(--flag);font-size:clamp(.9rem,3.6vw,1.05rem)}
 .logo{width:clamp(68px,19vw,104px);height:auto;flex:none;display:block}
 .logo .fig{fill:var(--cream)}
 .logo .gap{fill:var(--bg)}
@@ -271,7 +271,7 @@ const LOGO=`<svg class="logo" viewBox="0 0 300 200" role="img" aria-label="WDDE 
 </svg>`;
 
 /* Player headshots: drop a square photo at faces/<player id>.jpg and list the id here. No photo = initials badge. */
-const FACES={};
+const FACES={p1:2,p2:1,p3:1,p4:2,p5:1,p6:1,p7:1,p8:1,p9:1,p10:1};
 function avatar(p,cls=""){
   const ini=esc((p.name||"?").replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?");
   return FACES[p.id]?`<img class="av ${cls}" src="faces/${p.id}.jpg?v=${FACES[p.id]}" alt="">`:`<span class="av ${cls}" aria-hidden="true">${ini}</span>`;
