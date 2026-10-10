@@ -4,7 +4,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: one column, three views. Home = clubhouse leaderboard board. Tap a player = his scorecard (locked until Edit). Setup = handicaps and players. Single dark theme by choice. */
+/* Layout: one column, three views. Home = clubhouse leaderboard board. Tap a player = his scorecard (scores save as you type). Setup = handicaps and players. Single dark theme by choice. */
 :root{
   color-scheme:dark;
   --bg:#0b1a14; --board:#10291f; --row:#14322a; --line:#21483b;
@@ -69,14 +69,15 @@ tr.moved{animation:flash 1.2s ease-out}
 .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;background:var(--board);border:1px solid var(--line);border-radius:12px;padding:10px 6px}
 .sum b{display:block;font-family:var(--f-mono);font-size:1.25rem;font-variant-numeric:tabular-nums}
 .sum span{font-size:.62rem;font-family:var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.lock{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-block:12px;padding:10px 12px;border-radius:10px;border:1px dashed var(--line);color:var(--muted);font-size:.88rem}
-.lock.on{border:1px solid var(--flag);color:var(--flag);background:color-mix(in srgb,var(--flag) 8%,transparent)}
+.tip{margin-block:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--flag);color:var(--flag);background:color-mix(in srgb,var(--flag) 8%,transparent);font-size:.9rem}
 /* strip */
-.strip-wrap{overflow-x:auto;margin-bottom:12px;border:1px solid var(--line);border-radius:10px}
-.strip{border-collapse:collapse;font-family:var(--f-mono);font-size:.78rem;font-variant-numeric:tabular-nums;min-width:100%}
-.strip th,.strip td{padding:5px 0;width:2rem;min-width:2rem;text-align:center;border-left:1px solid var(--line)}
-.strip th:first-child,.strip td:first-child{border-left:0;width:3rem;min-width:3rem;text-align:left;padding-left:8px;color:var(--muted);font-weight:500}
+.strip-wrap{overflow:hidden;margin-bottom:12px;border:1px solid var(--line);border-radius:10px}
+.strip{border-collapse:collapse;table-layout:fixed;width:100%;font-family:var(--f-mono);font-size:.7rem;font-variant-numeric:tabular-nums}
+.strip th,.strip td{padding:5px 0;text-align:center;border-left:1px solid var(--line);overflow:hidden}
+.strip .mk{min-width:1.2rem;height:1.2rem}
+.strip th:first-child,.strip td:first-child{border-left:0;width:2.6rem;text-align:left;padding-left:6px;color:var(--muted);font-weight:500}
 .strip thead th{color:var(--muted);font-weight:500;background:var(--board)}
+.strip th:last-child,.strip td:last-child{width:2.2rem}
 .strip td.tot{color:var(--cream);font-weight:600;background:var(--board)}
 .strip td.s{cursor:pointer}
 /* score marks */
@@ -313,7 +314,7 @@ function renderBoard(){
   prevOrder=order;
 }
 function renderCard(){
-  const p=state.players.find(x=>x.id===view.id), s=stats(p), ed=view.edit;
+  const p=state.players.find(x=>x.id===view.id), s=stats(p);
   const out=sum(p.holes,0,9), inn=sum(p.holes,9,18);
   const has=(f,t)=>p.holes.slice(f,t).some(v=>v!=null);
   const stripRow=(f,t,label)=>`<tr><td>${label}</td>${COURSE.holes.slice(f,t).map((h,i)=>`<td class="s" data-jump="${f+i}">${mark(p.holes[f+i],h[1])||"·"}</td>`).join("")}<td class="tot">${has(f,t)?sum(p.holes,f,t):"–"}</td></tr>`;
@@ -324,7 +325,7 @@ function renderCard(){
   const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole" id="hole-${i}">
       <span class="no">${i+1}</span>
       <span class="info"><b>Par ${h[1]} · ${h[0]} m</b><span>${h[2]}</span></span>
-      <input id="s-${p.id}-${i}" data-hole="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="${ed?"–":""}" value="${p.holes[i]??""}" ${ed?"":"disabled"} aria-label="Hole ${i+1} score"></div>`};
+      <input id="s-${p.id}-${i}" data-hole="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
     <div class="ttl"><h2>${esc(p.name||"(no name)")}</h2><small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>
@@ -334,10 +335,7 @@ function renderCard(){
     <div><b class="${toParCls(s.toPar)}">${toParTxt(s.toPar)}</b><span>To par</span></div>
     <div><b>${fmt(s.net)}</b><span>Net</span></div>
   </div>
-  <div class="lock ${ed?"on":""}">
-    <span>${ed?"Editing "+esc(p.name)+"'s card. Check you've got the right player.":"Card locked. Tap Edit to enter scores."}</span>
-    <button class="btn ${ed?"sec":""}" id="toggleEdit" type="button">${ed?"Done":"Edit"}</button>
-  </div>
+  <p class="tip">Tap a hole and type ${esc(p.name)}'s score. It saves straight away and shows on everyone's phone.</p>
   ${strip(0,9,"Out","Out")}${strip(9,18,"In","In")}
   <div class="nine"><h3>Front nine</h3>${[0,1,2,3,4,5,6,7,8].map(holeRow).join("")}
     <div class="subt"><span>Out (par 36)</span><b>${has(0,9)?out:"–"}</b></div></div>
@@ -362,8 +360,7 @@ function go(name,id){view={name,id:id||null,edit:false};render();window.scrollTo
 document.addEventListener("click",e=>{
   const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
   const o=e.target.closest("[data-open]");if(o){go("card",o.dataset.open);return}
-  if(e.target.id==="toggleEdit"){view.edit=!view.edit;const y=window.scrollY;render();window.scrollTo(0,y);if(view.edit){const first=state.players.find(p=>p.id===view.id).holes.findIndex(v=>v==null);const el=$(`s-${view.id}-${first<0?17:first}`);if(el)el.focus({preventScroll:false})}return}
-  const j=e.target.closest("[data-jump]");if(j){const el=$("hole-"+j.dataset.jump);if(el){el.scrollIntoView({behavior:"smooth",block:"start"});if(view.edit)el.querySelector("input").focus({preventScroll:true})}return}
+  const j=e.target.closest("[data-jump]");if(j){const el=$("hole-"+j.dataset.jump);if(el){el.scrollIntoView({behavior:"smooth",block:"start"});el.querySelector("input").focus({preventScroll:true})}return}
   const d=e.target.closest("[data-del]");
   if(d){
     if(!d.classList.contains("confirm")){d.classList.add("confirm");d.textContent="Remove";setTimeout(()=>{if(d.isConnected){d.classList.remove("confirm");d.textContent="×"}},3000);return}
@@ -377,7 +374,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{const o=e.target.closest&&e.target.closest("[data-open]");if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();go("card",o.dataset.open)}});
 document.addEventListener("input",e=>{
   const el=e.target;
-  if(el.dataset.hole!=null&&view.name==="card"&&view.edit){
+  if(el.dataset.hole!=null&&view.name==="card"){
     const p=state.players.find(x=>x.id===view.id),i=+el.dataset.hole;
     p.holes[i]=num(el.value);saveHole(p,i);
     if(el.value.length>=1&&p.holes[i]!=null&&p.holes[i]>1&&i<17){const nx=$(`s-${p.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
