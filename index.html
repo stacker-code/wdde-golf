@@ -137,6 +137,9 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .form{margin:0 0 14px;padding:10px 12px;border-left:3px solid var(--flag);background:var(--board);border-radius:8px;font-style:italic;font-size:.95rem;color:var(--cream)}
 .form b{display:block;font-style:normal;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--flag);margin-bottom:2px}
 .hole .info b .shot{color:var(--green);font-weight:600;white-space:nowrap}
+.scoring{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.9rem;color:var(--muted)}
+.scoring a{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--cream);text-decoration:none;font-weight:600}
+.scoring a.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -394,7 +397,8 @@ function renderBoard(){
     </table>
     <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
   </section>
-  <div class="links"><button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>`;
+  <div class="links"><button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span><a class="on" aria-current="page" href="./">Stroke play</a><a  href="./stableford/">Stableford</a></nav>`;
   prevOrder=order;
 }
 function renderCard(){

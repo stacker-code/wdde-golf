@@ -138,6 +138,9 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .form b{display:block;font-style:normal;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--flag);margin-bottom:2px}
 .hole .info b .shot{color:var(--green);font-weight:600;white-space:nowrap}
 .altlink{display:block;margin-top:18px;text-align:center;color:var(--muted);font-size:.9rem}
+.scoring{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.9rem;color:var(--muted)}
+.scoring a{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--cream);text-decoration:none;font-weight:600}
+.scoring a.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -399,7 +402,7 @@ function renderBoard(){
     <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
   </section>
   <div class="links"><button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
-  <a class="altlink" href="../">Switch to stroke play (net) version</a>`;
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span><a  href="../">Stroke play</a><a class="on" aria-current="page" href="../stableford/">Stableford</a></nav>`;
   prevOrder=order;
 }
 function renderCard(){
