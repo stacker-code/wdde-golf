@@ -140,6 +140,30 @@ input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:
 .scoring{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.9rem;color:var(--muted)}
 .scoring a{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--cream);text-decoration:none;font-weight:600}
 .scoring a.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
+html.light{color-scheme:light;--bg:#ffffff;--board:#f4f8f5;--row:#ffffff;--line:#d6e3db;--cream:#12271e;--muted:#5b7468;--flag:#b8860b;--red:#c4412e;--green:#1d8a56;--blue:#2f6fae}
+html.light .board-head{background:#14322a;border-bottom-color:#14322a}
+html.light .board-head h2{color:#fff} html.light .board-head span{color:#b9d3c6}
+html.light tr.lead td.pos,html.light .btn{color:#fff}
+html.light .btn.sec{color:var(--cream)}
+html.light .hole{box-shadow:0 1px 2px rgba(18,39,30,.06)}
+html.light .hole input::placeholder{color:#a3b5ab}
+.faces{display:flex;flex:none}.faces .av{margin-left:-9px;box-shadow:0 0 0 2px var(--board)}.faces .av:first-child{margin-left:0}
+.tm{display:block;min-width:0}.tm small{display:block;font-size:.72rem;line-height:1.25;color:var(--muted);font-weight:500;margin-top:2px}
+.faces.sm{margin:4px 0 0}.faces.sm .av{width:24px;height:24px;font-size:.7rem;border-width:1.5px;margin-left:-6px}.faces.sm .av:first-child{margin-left:0}
+.seg{display:flex;gap:6px}.seg button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--cream);font-weight:600}.seg button.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
+.tcard{background:var(--row);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px}
+.tcard input.name{font:inherit;font-weight:600;width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream)}
+.tcard .who{font-size:.88rem;color:var(--muted)}
+.prow select{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream);max-width:9.5rem}
+.chk{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);white-space:nowrap}
+.chk input{width:1.2rem;height:1.2rem;accent-color:var(--flag)}
+.prow.off input.name{opacity:.45}
+.sect{font-family:var(--f-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 2px;font-size:1rem}
+.note{color:var(--muted);font-size:.9rem;padding:14px;text-align:center}
+.prow{grid-template-columns:1fr 4.2rem auto auto}
+.prow.assign{grid-template-columns:auto 1fr auto}
+.links .btn{flex:1}
+.scoring{flex-wrap:wrap}.scoring span{width:100%;text-align:center}.scoring a{white-space:nowrap}
 </style>
 
 <div class="wrap" id="app"></div>
@@ -166,26 +190,39 @@ const STORE_KEY="wdde-golf-v4";  // v4 = clean slate; older saves are wiped
 const DEFAULT_NAMES=["AB","Brocky","Don","Gilly","Joey","JT","Locky","Rocket","Shark","Wally"];
 const blankHoles=()=>Array(18).fill(null);
 let MODE="local", SB=null, syncNote="Saved on this phone only.";
-function defaultState(){return{players:DEFAULT_NAMES.map((n,i)=>({id:"p"+(i+1),name:n,hcp:null,sort:i+1,holes:blankHoles()}))}}
+/* Scoring method and theme come from the address: ?s=stableford | ?s=ambrose, &theme=light */
+const QS=new URLSearchParams(location.search);
+const SCORING=["stableford","ambrose"].includes(QS.get("s"))?QS.get("s"):"stroke";
+const THEME=QS.get("theme")==="light"?"light":"dark";
+if(THEME==="light")document.documentElement.classList.add("light");
+function href(sc,th){const q=new URLSearchParams();if(sc!=="stroke")q.set("s",sc);if(th==="light")q.set("theme","light");const x=q.toString();return "./"+(x?"?"+x:"")}
+function defaultState(){return{players:DEFAULT_NAMES.map((n,i)=>({id:"p"+(i+1),name:n,hcp:null,sort:i+1,playing:true,holes:blankHoles()})),teams:[],teamSize:3}}
 function loadLocal(){
   try{
     ["wdde-golf-v1","wdde-golf-v2","wdde-golf-v3"].forEach(k=>localStorage.removeItem(k));
     const raw=localStorage.getItem(STORE_KEY);
-    if(raw){const s=JSON.parse(raw);if(s&&Array.isArray(s.players)){s.players.forEach(p=>{if(!Array.isArray(p.holes)||p.holes.length!==18)p.holes=blankHoles()});return s}}
+    if(raw){const s=JSON.parse(raw);if(s&&Array.isArray(s.players)){s.players.forEach(p=>{if(!Array.isArray(p.holes)||p.holes.length!==18)p.holes=blankHoles()});s.teams=Array.isArray(s.teams)?s.teams:[];s.teamSize=s.teamSize||3;return s}}
   }catch(e){}
   return defaultState();
 }
 function saveLocal(){try{localStorage.setItem(STORE_KEY,JSON.stringify(state))}catch(e){}}
 function liveFailed(msg){MODE="local";syncNote=msg;saveLocal();render()}
 async function fetchAll(){
-  const [pl,sc]=await Promise.all([
-    SB.from("players").select("id,name,hcp,sort").order("sort"),
-    SB.from("scores").select("player_id,hole,strokes")]);
+  const [pl,sc,tm,ts,st]=await Promise.all([
+    SB.from("players").select("id,name,hcp,sort,playing").order("sort"),
+    SB.from("scores").select("player_id,hole,strokes"),
+    SB.from("teams").select("id,name,members,sort").order("sort"),
+    SB.from("team_scores").select("team_id,hole,strokes"),
+    SB.from("settings").select("key,value")]);
   if(pl.error||sc.error)throw (pl.error||sc.error);
-  const players=pl.data.map(r=>({id:r.id,name:r.name,hcp:r.hcp==null?null:Number(r.hcp),sort:r.sort,holes:blankHoles()}));
+  const players=pl.data.map(r=>({id:r.id,name:r.name,hcp:r.hcp==null?null:Number(r.hcp),sort:r.sort,playing:r.playing!==false,holes:blankHoles()}));
   const by=Object.fromEntries(players.map(p=>[p.id,p]));
   sc.data.forEach(r=>{const p=by[r.player_id];if(p&&r.hole>=1&&r.hole<=18)p.holes[r.hole-1]=r.strokes});
-  return{players};
+  const teams=(tm.data||[]).map(r=>({id:r.id,name:r.name,members:r.members||[],sort:r.sort||0,holes:blankHoles()}));
+  const tby=Object.fromEntries(teams.map(t=>[t.id,t]));
+  (ts.data||[]).forEach(r=>{const t=tby[r.team_id];if(t&&r.hole>=1&&r.hole<=18)t.holes[r.hole-1]=r.strokes});
+  const sz=(st.data||[]).find(r=>r.key==="team_size");
+  return{players,teams,teamSize:sz?(+sz.value||3):3};
 }
 async function startStore(){
   if(!SUPABASE_URL||!SUPABASE_ANON_KEY)return;
@@ -198,6 +235,9 @@ async function startStore(){
     SB.channel("wdde-golf")
       .on("postgres_changes",{event:"*",schema:"public",table:"scores"},applyScoreEvent)
       .on("postgres_changes",{event:"*",schema:"public",table:"players"},applyPlayerEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"teams"},applyTeamEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"team_scores"},applyTeamScoreEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"settings"},applySettingEvent)
       .subscribe(st=>{if(st==="SUBSCRIBED"){syncNote="Live: scores sync across everyone's phones.";resync()}
         else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT"){syncNote="Live connection dropped. Retrying… scores still save.";rerender()}});
     document.addEventListener("visibilitychange",()=>{if(!document.hidden)resync()});
@@ -212,9 +252,21 @@ function applyPlayerEvent(ev){
   if(ev.eventType==="DELETE"){state.players=state.players.filter(p=>p.id!==ev.old.id);rerender();return}
   const r=ev.new;let p=state.players.find(x=>x.id===r.id);
   if(!p){p={id:r.id,holes:blankHoles()};state.players.push(p)}
-  p.name=r.name;p.hcp=r.hcp==null?null:Number(r.hcp);p.sort=r.sort;
+  p.name=r.name;p.hcp=r.hcp==null?null:Number(r.hcp);p.sort=r.sort;p.playing=r.playing!==false;
   state.players.sort((a,b)=>(a.sort||0)-(b.sort||0));rerender();
 }
+function applyTeamEvent(ev){
+  if(ev.eventType==="DELETE"){state.teams=state.teams.filter(t=>t.id!==ev.old.id);rerender();return}
+  const r=ev.new;let t=state.teams.find(x=>x.id===r.id);
+  if(!t){t={id:r.id,holes:blankHoles()};state.teams.push(t)}
+  t.name=r.name;t.members=r.members||[];t.sort=r.sort||0;
+  state.teams.sort((a,b)=>(a.sort||0)-(b.sort||0));rerender();
+}
+function applyTeamScoreEvent(ev){
+  const r=ev.eventType==="DELETE"?ev.old:ev.new;const t=state.teams.find(x=>x.id===r.team_id);if(!t||!r.hole)return;
+  t.holes[r.hole-1]=ev.eventType==="DELETE"?null:r.strokes;rerender();
+}
+function applySettingEvent(ev){const r=ev.new;if(ev.eventType!=="DELETE"&&r&&r.key==="team_size"){state.teamSize=+r.value||3;rerender()}}
 const timers={};
 function debounce(key,fn,ms=400){clearTimeout(timers[key]);timers[key]=setTimeout(fn,ms)}
 /* Writes retry until they land (patchy signal on the course). A newer edit to the same box replaces an older pending one. */
@@ -239,7 +291,7 @@ function persist(key,meta,op){
 function warn(e){if(e){syncNote="Last change didn't reach the live board. Check signal and try again.";rerender()}}
 function savePlayer(p){
   if(MODE!=="live")return saveLocal();
-  debounce("p"+p.id,()=>persist("p"+p.id,{},()=>SB.from("players").upsert({id:p.id,name:p.name,hcp:p.hcp,sort:p.sort||0})));
+  debounce("p"+p.id,()=>persist("p"+p.id,{},()=>SB.from("players").upsert({id:p.id,name:p.name,hcp:p.hcp,sort:p.sort||0,playing:p.playing!==false})));
 }
 function saveHole(p,i){
   if(MODE!=="live")return saveLocal();
@@ -249,23 +301,42 @@ function saveHole(p,i){
       :SB.from("scores").upsert({player_id:p.id,hole:i+1,strokes:v});
   }),250);
 }
+function saveTeam(t){
+  if(MODE!=="live")return saveLocal();
+  debounce("t"+t.id,()=>persist("t"+t.id,{},()=>SB.from("teams").upsert({id:t.id,name:t.name,members:t.members,sort:t.sort||0})),300);
+}
+function saveTeamHole(t,i){
+  if(MODE!=="live")return saveLocal();
+  debounce("th"+t.id+i,()=>persist("th"+t.id+"-"+i,{tid:t.id,i,get v(){return t.holes[i]}},()=>{
+    const v=t.holes[i];
+    return v==null?SB.from("team_scores").delete().match({team_id:t.id,hole:i+1})
+      :SB.from("team_scores").upsert({team_id:t.id,hole:i+1,strokes:v});
+  }),250);
+}
+function saveSetting(k,v){
+  if(MODE!=="live")return saveLocal();
+  persist("s"+k,{},()=>SB.from("settings").upsert({key:k,value:String(v)}));
+}
 async function addPlayer(p){
   p.sort=Math.max(0,...state.players.map(x=>x.sort||0))+1;
   if(MODE!=="live")return saveLocal();
-  const{error}=await SB.from("players").insert({id:p.id,name:p.name,hcp:null,sort:p.sort});warn(error);
+  const{error}=await SB.from("players").insert({id:p.id,name:p.name,hcp:null,sort:p.sort,playing:true});warn(error);
 }
 async function removePlayerFromStore(id){
   if(MODE!=="live")return saveLocal();
   const{error}=await SB.from("players").delete().eq("id",id);warn(error);
 }
 async function clearAllScores(){
-  state.players.forEach(p=>p.holes=blankHoles());
+  state.players.forEach(p=>p.holes=blankHoles());state.teams.forEach(t=>t.holes=blankHoles());
   if(MODE!=="live")return saveLocal();
   const{error}=await SB.from("scores").delete().gte("hole",1);warn(error);
+  const r2=await SB.from("team_scores").delete().gte("hole",1);warn(r2.error);
 }
 function onRemoteChange(newState){
   /* keep scores this phone hasn't managed to send yet */
-  Object.values(pending).forEach(m=>{if(m.pid==null)return;const p=newState.players.find(x=>x.id===m.pid);if(p)p.holes[m.i]=m.v});
+  Object.values(pending).forEach(m=>{
+    if(m.pid!=null){const p=newState.players.find(x=>x.id===m.pid);if(p)p.holes[m.i]=m.v}
+    if(m.tid!=null){const t=newState.teams.find(x=>x.id===m.tid);if(t)t.holes[m.i]=m.v}});
   state=newState;rerender()}
 /* ======================= end STORE ======================= */
 
@@ -346,13 +417,21 @@ const numDec=v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).rep
 const fmt=n=>n==null?"–":(Number.isInteger(n)?String(n):n.toFixed(1));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sum=(a,f,t)=>a.slice(f,t).reduce((s,v)=>s+(v||0),0);
-function stats(p){
+/* Stableford: net par = 2 points, +1 per shot better, -1 per shot worse, never below 0. */
+function holePts(holes,hcp,i){const v=holes[i];return v==null?null:Math.max(0,2+PAR[i]-(v-shots(hcp,i)))}
+const playingPlayers=()=>state.players.filter(p=>p.playing!==false);
+/* Ambrose team handicap: combined handicaps divided by (2 x players in the team): 2 players /4, 3 players /6, 4 players /8. */
+function teamMembers(t){return (t.members||[]).map(id=>state.players.find(p=>p.id===id)).filter(p=>p&&p.playing!==false)}
+function teamHcp(t){const m=teamMembers(t);if(!m.length)return 0;return Math.round(m.reduce((a,p)=>a+(p.hcp||0),0)/(2*m.length)*10)/10}
+function stats(p){return statsFor(p.holes,p.hcp)}
+function statsFor(holes,hcp){
+  const p={holes,hcp};
   const played=p.holes.map((v,i)=>v!=null?i:-1).filter(i=>i>=0);
   const gross=played.length?sum(p.holes,0,18):null;
   const parPlayed=played.reduce((s,i)=>s+PAR[i],0);
   /* Net to par: handicap strokes are taken on the holes played, by stroke index, as on a real card. */
   const netExact=gross==null?null:gross-parPlayed-played.reduce((s,i)=>s+shots(p.hcp,i),0);
-  return{thru:played.length,gross,toPar:gross==null?null:gross-parPlayed,netExact,net:netExact==null?null:Math.round(netExact)};
+  return{thru:played.length,gross,toPar:gross==null?null:gross-parPlayed,netExact,net:netExact==null?null:Math.round(netExact),pts:played.reduce((s,i)=>s+holePts(holes,hcp,i),0)};
 }
 const toParTxt=n=>n==null?"–":n===0?"E":(n>0?"+"+n:String(n));
 const toParCls=n=>n==null||n===0?"":n<0?"under":"over";
@@ -365,63 +444,83 @@ function mark(score,par){
 /* ---------- views ---------- */
 function render(){
   if(view.name==="card"&&!state.players.find(p=>p.id===view.id))view={name:"board",id:null,edit:false};
-  if(view.name==="board")renderBoard();else if(view.name==="card")renderCard();else renderSetup();
+  if(view.name==="team"&&!state.teams.find(t=>t.id===view.id))view={name:"board",id:null,edit:false};
+  if(view.name==="board")renderBoard();else if(view.name==="card")renderCard();else if(view.name==="team")renderTeamCard();else if(view.name==="teams")renderTeams();else renderSetup();
 }
+const SUN='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg>';
+const RULES={
+  stroke:'Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index, "SI" on each hole), like a normal card. Tap a player to see or enter his card.',
+  stableford:'<b>Stableford.</b> Most points wins. Each hole: net par 2 points, net birdie 3, net bogey 1, worse 0. Handicap shots come on the hardest holes ("SI"). Just type your real score; if you pick up, enter any big number. Tap a player to see or enter his card.',
+  ambrose:'<b>Ambrose.</b> Everyone hits, the team picks the best shot and all play from there. One team score per hole. Team handicap = combined handicaps ÷ (2 × players), e.g. three players off 10, 15 and 20 = 45 ÷ 6 = 7.5. Lowest net wins. Tap a team to enter its scores.'
+};
+function activeTeams(){return state.teams.filter(t=>teamMembers(t).length).sort((a,b)=>(a.sort||0)-(b.sort||0))}
 function renderBoard(){
-  const list=state.players.map(p=>Object.assign({p},stats(p)));
-  const scored=list.filter(x=>x.gross!=null).sort((a,b)=>a.net-b.net||a.netExact-b.netExact||b.thru-a.thru);
-  const rest=list.filter(x=>x.gross==null).sort((a,b)=>a.p.name.localeCompare(b.p.name,"en",{sensitivity:"base"}));
-  let pos=0,last=null;scored.forEach((x,i)=>{if(x.net!==last){pos=i+1;last=x.net}x.pos=pos});
+  const amb=SCORING==="ambrose", sf=SCORING==="stableford";
+  const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true,hcpShown:teamHcp(t)},statsFor(t.holes,teamHcp(t))))
+                :playingPlayers().map(p=>Object.assign({p,hcpShown:p.hcp},stats(p)));
+  const key=x=>sf?-x.pts:x.net;
+  const scored=list.filter(x=>x.gross!=null).sort((a,b)=>key(a)-key(b)||(sf?a.thru-b.thru:(a.netExact-b.netExact||b.thru-a.thru)));
+  const rest=list.filter(x=>x.gross==null).sort((a,b)=>amb?(a.p.sort||0)-(b.p.sort||0):a.p.name.localeCompare(b.p.name,"en",{sensitivity:"base"}));
+  let pos=0,last=null;scored.forEach((x,i)=>{if(key(x)!==last){pos=i+1;last=key(x)}x.pos=pos});
   scored.forEach(x=>x.label=(scored.filter(y=>y.pos===x.pos).length>1?"T":"")+x.pos);
   scored.forEach(x=>{const m=posMemo[x.p.id];posMemo[x.p.id]=m&&m.pos!==x.pos?{pos:x.pos,mv:m.pos-x.pos,at:Date.now()}:m?Object.assign(m,{pos:x.pos}):{pos:x.pos,mv:0,at:0}});
   const all=scored.concat(rest), order=all.map(x=>x.p.id);
+  const who=x=>x.team
+    ?`<span class="tm">${esc(x.p.name||"Team")}<span class="chev">›</span><span class="faces sm">${teamMembers(x.p).map(m=>avatar(m)).join("")}</span><small>${teamMembers(x.p).map(m=>esc(m.name)).join(", ")}</small></span>`
+    :`<span class="nmw">${avatar(x.p)}<span>${esc(x.p.name||"(no name)")}<span class="chev">›</span></span></span>`;
+  const lastCol=x=>sf?(x.gross==null?"–":x.pts):`<span class="${toParCls(x.net)}">${toParTxt(x.net)}</span>`;
+  const other=THEME==="light"?"dark":"light";
   $("app").innerHTML=`
   <header>
     <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“Where the greens break both ways”</p></div></div>
-    <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="light.html" aria-label="Switch to the light version" title="Switch to the light version"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></a></div>
-    <p>Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index, "SI" on each hole), like a normal card. Tap a player to see or enter his card.</p>
+    <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="${href(SCORING,other)}" aria-label="Switch to the ${other} version" title="Switch to the ${other} version">${THEME==="light"?MOON:SUN}</a></div>
+    <p>${RULES[SCORING]}</p>
   </header>
   <section class="board" aria-label="Leaderboard">
-    <div class="board-head"><h2>Leaderboard</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${state.players.length} started</span></div>
-    <table class="tbl">
-      <thead><tr><th>Pos</th><th>Player</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>Net</th></tr></thead>
+    <div class="board-head"><h2>${amb?"Teams":"Leaderboard"}</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${list.length} started</span></div>
+    ${amb&&!list.length?`<p class="note">No teams yet. Tap <b>Teams</b> below to pick them.</p>`:`<table class="tbl">
+      <thead><tr><th>Pos</th><th>${amb?"Team":"Player"}</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>${sf?"Pts":"Net"}</th></tr></thead>
       <tbody>${all.map((x,i)=>{
         const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty?0:(m=>m&&m.mv&&Date.now()-m.at<MOVE_MS?m.mv:0)(posMemo[x.p.id]), moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
-        return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" data-open="${x.p.id}" tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
+        return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" ${x.team?`data-team="${x.p.id}"`:`data-open="${x.p.id}"`} tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
           <td class="pos">${empty?"–":x.label}${mv>0?`<span class="mv up" aria-label="up ${mv}">▲${mv}</span>`:mv<0?`<span class="mv dn" aria-label="down ${-mv}">▼${-mv}</span>`:""}</td>
-          <td class="nm"><span class="nmw">${avatar(x.p)}<span>${esc(x.p.name||"(no name)")}<span class="chev">›</span></span></span></td>
+          <td class="nm">${who(x)}</td>
           <td class="thru">${x.thru===18?"F":x.thru||"–"}</td>
           <td><span class="${toParCls(x.toPar)}">${fmt(x.gross)}</span></td>
-          <td>${x.p.hcp==null?"–":fmt(x.p.hcp)}</td>
-          <td class="net"><span class="${toParCls(x.net)}">${toParTxt(x.net)}</span></td></tr>`}).join("")}</tbody>
-    </table>
+          <td>${x.hcpShown==null?"–":fmt(x.hcpShown)}</td>
+          <td class="net">${lastCol(x)}</td></tr>`}).join("")}</tbody>
+    </table>`}
     <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
   </section>
-  <div class="links"><button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
-  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span><a class="on" aria-current="page" href="./">Stroke play</a><a  href="./stableford/">Stableford</a></nav>`;
+  <div class="links">${amb?`<button class="btn" data-go="teams" type="button">Teams</button>`:""}<button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<a ${k===SCORING?'class="on" aria-current="page"':""} href="${href(k,THEME)}">${l}</a>`).join("")}</nav>`;
   prevOrder=order;
 }
-function renderCard(){
-  const p=state.players.find(x=>x.id===view.id), s=stats(p);
+function renderCard(){renderScorecard(state.players.find(x=>x.id===view.id),false)}
+function renderTeamCard(){renderScorecard(state.teams.find(x=>x.id===view.id),true)}
+function renderScorecard(p,isTeam){
+  const hcp=isTeam?teamHcp(p):p.hcp, holes=p.holes, s=statsFor(holes,hcp), IN=isTeam?"ts":"s";
   const out=sum(p.holes,0,9), inn=sum(p.holes,9,18);
   const has=(f,t)=>p.holes.slice(f,t).some(v=>v!=null);
   const stripRow=(f,t,label)=>`<tr><td>${label}</td>${COURSE.holes.slice(f,t).map((h,i)=>`<td class="s" data-jump="${f+i}">${mark(p.holes[f+i],h[1])||"·"}</td>`).join("")}<td class="tot">${has(f,t)?sum(p.holes,f,t):"–"}</td></tr>`;
   const strip=(f,t,lab,totLab)=>`<div class="strip-wrap"><table class="strip">
       <thead><tr><th>${lab}</th>${COURSE.holes.slice(f,t).map((h,i)=>`<th${f+i===CTP?' class="ctp" title="Closest to the pin"':""}>${f+i+1}</th>`).join("")}<th>${totLab}</th></tr></thead>
       <tbody><tr><td>Par</td>${COURSE.holes.slice(f,t).map(h=>`<td>${h[1]}</td>`).join("")}<td class="tot">${PAR.slice(f,t).reduce((a,b)=>a+b,0)}</td></tr>
-      ${stripRow(f,t,"Score")}</tbody></table></div>`;
+      ${stripRow(f,t,"Score")}${SCORING==="stableford"?`<tr><td>Pts</td>${COURSE.holes.slice(f,t).map((h,i)=>`<td>${holes[f+i]==null?"·":holePts(holes,hcp,f+i)}</td>`).join("")}<td class="tot">${has(f,t)?COURSE.holes.slice(f,t).reduce((a,h,i)=>a+(holePts(holes,hcp,f+i)||0),0):"–"}</td></tr>`:""}</tbody></table></div>`;
   const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole${i===CTP?" ctp":""}" id="hole-${i}">
       <span class="no">${i+1}</span>
-      <span class="info"><b>Par ${h[1]} · ${h[0]} m · SI ${SI[i]}${(n=>n>0?` <span class="shot">+${n} shot${n>1?"s":""}</span>`:"")(shots(p.hcp,i))}</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
-      <input id="s-${p.id}-${i}" data-hole="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
+      <span class="info"><b>Par ${h[1]} · ${h[0]} m · SI ${SI[i]}${(n=>n>0?` <span class="shot">+${n} shot${n>1?"s":""}</span>`:"")(shots(hcp,i))}</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
+      <input id="${IN}-${p.id}-${i}" ${isTeam?"data-thole":"data-hole"}="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
-    ${avatar(p,"lg")}<div class="ttl"><h2>${esc(p.name||"(no name)")}</h2>${BIOS[p.id]?`<p class="tform"><b>Form</b> ${esc(BIOS[p.id])}</p>`:""}<small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>
+    ${isTeam?`<span class="faces">${teamMembers(p).map(m=>avatar(m)).join("")}</span><div class="ttl"><h2>${esc(p.name||"Team")}</h2><p class="tform">${teamMembers(p).map(m=>esc(m.name)+" ("+(m.hcp==null?"no hcp":fmt(m.hcp))+")").join(", ")}</p><small>Team hcp ${fmt(hcp)} · ${COURSE.tees}</small></div></div>`
+    :`${avatar(p,"lg")}<div class="ttl"><h2>${esc(p.name||"(no name)")}</h2>${BIOS[p.id]?`<p class="tform"><b>Form</b> ${esc(BIOS[p.id])}</p>`:""}<small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>`}
   <div class="sum">
     <div><b>${s.thru===18?"F":s.thru}</b><span>Thru</span></div>
     <div><b>${fmt(s.gross)}</b><span>Gross</span></div>
     <div><b class="${toParCls(s.toPar)}">${toParTxt(s.toPar)}</b><span>To par</span></div>
-    <div><b class="${toParCls(s.net)}">${toParTxt(s.net)}</b><span>Net</span></div>
+    ${SCORING==="stableford"?`<div><b>${s.thru?s.pts:"–"}</b><span>Points</span></div>`:`<div><b class="${toParCls(s.net)}">${toParTxt(s.net)}</b><span>Net</span></div>`}
   </div>
   ${strip(0,9,"Out","Out")}${strip(9,18,"In","In")}
   <div class="nine"><h3>Front nine</h3>${[0,1,2,3,4,5,6,7,8].map(holeRow).join("")}
@@ -435,10 +534,48 @@ function renderSetup(){
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Handicaps &amp; players</h2><small>Set before tee-off</small></div></div>
   <section class="panel">
-    <p class="hint">Enter each player's handicap. Rename, add or remove players here. Removing a player deletes his card.</p>
-    ${state.players.map(p=>`<div class="prow"><input class="name" id="n-${p.id}" data-id="${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><button class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
+    <p class="hint">Enter each player's handicap. Untick <b>Playing</b> to hide someone from the leaderboards without deleting him. Rename, add or remove players here. Removing a player deletes his card.</p>
+    ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" data-id="${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${p.playing!==false?"checked":""}>Playing</label><button class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
     <form class="add" id="addForm"><input class="name" id="newName" placeholder="Add a player" autocomplete="off"><button class="btn" type="submit">Add</button></form>
     <div class="links"><button class="btn sec" id="clearAll" type="button">Clear every scorecard</button></div>
+  </section>`;
+}
+
+function ensureTeams(n){
+  for(let k=1;k<=n;k++){const id="t"+k;if(!state.teams.find(t=>t.id===id)){const t={id,name:"Team "+k,members:[],sort:k,holes:blankHoles()};state.teams.push(t);saveTeam(t)}}
+  state.teams.sort((a,b)=>(a.sort||0)-(b.sort||0));
+}
+function teamCount(){return Math.max(1,Math.ceil(playingPlayers().length/(state.teamSize||3)))}
+/* Even teams: snake draft by handicap (best with worst). Random: shuffle, then deal out. */
+function autoTeams(random){
+  const n=teamCount();ensureTeams(n);
+  let ps=playingPlayers().slice();
+  if(random){for(let i=ps.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ps[i],ps[j]]=[ps[j],ps[i]]}}
+  else ps.sort((a,b)=>(a.hcp??99)-(b.hcp??99));
+  const pick=state.teams.filter(t=>+t.id.slice(1)<=n).sort((a,b)=>a.sort-b.sort);
+  state.teams.forEach(t=>t.members=[]);
+  ps.forEach((p,i)=>{const r=Math.floor(i/n),c=i%n;pick[random||r%2===0?c:n-1-c].members.push(p.id)});
+  state.teams.forEach(saveTeam);
+}
+function assign(pid,tid){
+  state.teams.forEach(t=>{if(t.members.includes(pid)&&t.id!==tid){t.members=t.members.filter(x=>x!==pid);saveTeam(t)}});
+  const t=state.teams.find(x=>x.id===tid);if(t&&!t.members.includes(pid)){t.members.push(pid);saveTeam(t)}
+}
+function renderTeams(){
+  const n=teamCount();ensureTeams(n);
+  const teams=state.teams.filter(t=>+t.id.slice(1)<=n||teamMembers(t).length);
+  const teamOf=pid=>(state.teams.find(t=>t.members.includes(pid))||{}).id||"";
+  $("app").innerHTML=`
+  <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Ambrose teams</h2><small>${playingPlayers().length} playing · ${n} team${n>1?"s":""}</small></div></div>
+  <section class="panel">
+    <h3 class="sect">Players per team</h3>
+    <div class="seg">${[2,3,4].map(k=>`<button type="button" data-size="${k}" class="${(state.teamSize||3)===k?"on":""}">${k}</button>`).join("")}</div>
+    <div class="links"><button class="btn" id="autoTeams" type="button">Make even teams</button><button class="btn sec" id="randTeams" type="button">Randomise</button></div>
+    <p class="hint"><b>Make even teams</b> spreads the handicaps fairly (best with worst). <b>Randomise</b> draws them out of a hat. Or pick each player's team below. Team handicaps update by themselves.</p>
+    <h3 class="sect">Teams</h3>
+    ${teams.map(t=>`<div class="tcard"><input class="name" data-tname="${t.id}" value="${esc(t.name)}" aria-label="Team name"><div class="who">${teamMembers(t).map(m=>esc(m.name)).join(", ")||"No players yet"} · Team hcp <b>${fmt(teamHcp(t))}</b></div></div>`).join("")}
+    <h3 class="sect">Who's in which team</h3>
+    ${playingPlayers().map(p=>`<div class="prow assign">${avatar(p)}<span>${esc(p.name)} <small class="hint">(${p.hcp==null?"no hcp":fmt(p.hcp)})</small></span><select data-assign="${p.id}" aria-label="Team for ${esc(p.name)}"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}" ${teamOf(p.id)===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div>`).join("")}
   </section>`;
 }
 
@@ -447,6 +584,10 @@ function go(name,id){view={name,id:id||null,edit:false};render();window.scrollTo
 document.addEventListener("click",e=>{
   const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
   const o=e.target.closest("[data-open]");if(o){go("card",o.dataset.open);return}
+  const tm=e.target.closest("[data-team]");if(tm){go("team",tm.dataset.team);return}
+  const sz=e.target.closest("[data-size]");if(sz){state.teamSize=+sz.dataset.size;saveSetting("team_size",state.teamSize);render();return}
+  if(e.target.id==="autoTeams"){autoTeams(false);render();return}
+  if(e.target.id==="randTeams"){autoTeams(true);render();return}
   const j=e.target.closest("[data-jump]");if(j){const el=$("hole-"+j.dataset.jump);if(el){el.scrollIntoView({behavior:"smooth",block:"start"});el.querySelector("input").focus({preventScroll:true})}return}
   const d=e.target.closest("[data-del]");
   if(d){
@@ -458,7 +599,12 @@ document.addEventListener("click",e=>{
     clearAllScores();render();
   }
 });
-document.addEventListener("keydown",e=>{const o=e.target.closest&&e.target.closest("[data-open]");if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();go("card",o.dataset.open)}});
+document.addEventListener("keydown",e=>{const o=e.target.closest&&e.target.closest("[data-open],[data-team]");if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();o.dataset.team?go("team",o.dataset.team):go("card",o.dataset.open)}});
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.dataset.assign){assign(el.dataset.assign,el.value);render();return}
+  if(el.dataset.play){const p=state.players.find(x=>x.id===el.dataset.play);if(p){p.playing=el.checked;savePlayer(p);render()}}
+});
 document.addEventListener("input",e=>{
   const el=e.target;
   if(el.dataset.hole!=null&&view.name==="card"){
@@ -467,6 +613,14 @@ document.addEventListener("input",e=>{
     if(el.value.length>=1&&p.holes[i]!=null&&p.holes[i]>1&&i<17){const nx=$(`s-${p.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
     refreshCardNumbers();return;
   }
+  if(el.dataset.thole!=null&&view.name==="team"){
+    const t=state.teams.find(x=>x.id===view.id),i=+el.dataset.thole;
+    t.holes[i]=num(el.value);saveTeamHole(t,i);
+    if(el.value.length>=1&&t.holes[i]!=null&&t.holes[i]>1&&i<17){const nx=$(`ts-${t.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
+    rerender();return;
+  }
+  if(el.dataset.tname){const t=state.teams.find(x=>x.id===el.dataset.tname);if(t){t.name=el.value;saveTeam(t)}return}
+  if(el.dataset.play||el.dataset.assign)return;
   const id=el.dataset.id,f=el.dataset.f;if(!id||!f)return;
   const p=state.players.find(x=>x.id===id);if(!p)return;
   p[f]=f==="name"?el.value:numDec(el.value);savePlayer(p);});
