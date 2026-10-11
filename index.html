@@ -554,8 +554,29 @@ function autoTeams(random){
   else ps.sort((a,b)=>(a.hcp??99)-(b.hcp??99));
   const pick=state.teams.filter(t=>+t.id.slice(1)<=n).sort((a,b)=>a.sort-b.sort);
   state.teams.forEach(t=>t.members=[]);
-  ps.forEach((p,i)=>{const r=Math.floor(i/n),c=i%n;pick[random||r%2===0?c:n-1-c].members.push(p.id)});
+  const best=random?null:bestSplit(ps,n,state.teamSize||3);
+  if(best)best.forEach((g,k)=>g.forEach(p=>pick[k].members.push(p.id)));
+  else ps.forEach((p,i)=>{const r=Math.floor(i/n),c=i%n;pick[random||r%2===0?c:n-1-c].members.push(p.id)});
   state.teams.forEach(saveTeam);
+}
+/* Try every way to split the players into teams and keep the one whose team handicaps are closest together.
+   Fine for a golf day (9 players = 280 splits); falls back to the snake draft if it would take too long. */
+function bestSplit(ps,n,size){
+  const base=Math.floor(ps.length/n),extra=ps.length%n,sizes=Array.from({length:n},(_,k)=>base+(k<extra?1:0)); /* 9 players in teams of 4 = 3+3+3, not 4+4+1 */
+  if(!base||ps.length>12)return null;
+  const th=g=>g.reduce((a,p)=>a+(p.hcp||0),0)/(2*g.length);
+  let best=null,bestSpread=Infinity,tries=0;
+  const groups=sizes.map(()=>[]);
+  (function place(i){
+    if(++tries>200000)return;
+    if(i===ps.length){const h=groups.map(th),spread=Math.max(...h)-Math.min(...h);if(spread<bestSpread-1e-9){bestSpread=spread;best=groups.map(g=>g.slice())}return}
+    for(let k=0;k<n;k++){
+      if(groups[k].length>=sizes[k])continue;
+      if(groups[k].length===0&&groups.slice(0,k).some(g=>g.length===0&&sizes[groups.indexOf(g)]===sizes[k]))continue; /* skip mirror-image splits */
+      groups[k].push(ps[i]);place(i+1);groups[k].pop();
+    }
+  })(0);
+  return best;
 }
 function assign(pid,tid){
   state.teams.forEach(t=>{if(t.members.includes(pid)&&t.id!==tid){t.members=t.members.filter(x=>x!==pid);saveTeam(t)}});
@@ -571,7 +592,7 @@ function renderTeams(){
     <h3 class="sect">Players per team</h3>
     <div class="seg">${[2,3,4].map(k=>`<button type="button" data-size="${k}" class="${(state.teamSize||3)===k?"on":""}">${k}</button>`).join("")}</div>
     <div class="links"><button class="btn" id="autoTeams" type="button">Make even teams</button><button class="btn sec" id="randTeams" type="button">Randomise</button></div>
-    <p class="hint"><b>Make even teams</b> spreads the handicaps fairly (best with worst). <b>Randomise</b> draws them out of a hat. Or pick each player's team below. Team handicaps update by themselves.</p>
+    <p class="hint"><b>Make even teams</b> finds the split where the team handicaps are as close together as possible. <b>Randomise</b> draws them out of a hat. Or pick each player's team below. Team handicaps update by themselves.</p>
     <h3 class="sect">Teams</h3>
     ${teams.map(t=>`<div class="tcard"><input class="name" data-tname="${t.id}" value="${esc(t.name)}" aria-label="Team name"><div class="who">${teamMembers(t).map(m=>esc(m.name)).join(", ")||"No players yet"} · Team hcp <b>${fmt(teamHcp(t))}</b></div></div>`).join("")}
     <h3 class="sect">Who's in which team</h3>
