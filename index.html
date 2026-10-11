@@ -163,6 +163,16 @@ html.light .hole input::placeholder{color:#a3b5ab}
 .prow{grid-template-columns:1fr 4.2rem auto auto}
 .prow.assign{grid-template-columns:auto 1fr auto}
 .links .btn{flex:1}
+.pastbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--flag);color:var(--flag);background:color-mix(in srgb,var(--flag) 10%,transparent);font-size:.9rem}
+.pastbar b{color:var(--cream)}
+.pastbar button{flex:none;border:1px solid var(--flag);background:transparent;color:var(--flag);border-radius:8px;padding:7px 10px;font-weight:600}
+.evcard{display:block;width:100%;text-align:left;background:var(--row);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--cream)}
+.evcard b{display:block;font-size:1.05rem}
+.evcard span{display:block;color:var(--muted);font-size:.85rem;margin-top:2px}
+.evcard .win{color:var(--flag);font-weight:600}
+.scoring button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--cream);background:transparent;font-weight:600;white-space:nowrap}
+.scoring button.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
+#evName{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream)}
 .scoring{flex-wrap:wrap}.scoring span{width:100%;text-align:center}.scoring a{white-space:nowrap}
 </style>
 
@@ -192,7 +202,9 @@ const blankHoles=()=>Array(18).fill(null);
 let MODE="local", SB=null, syncNote="Saved on this phone only.";
 /* Scoring method and theme come from the address: ?s=stableford | ?s=ambrose, &theme=light */
 const QS=new URLSearchParams(location.search);
-const SCORING=["stableford","ambrose"].includes(QS.get("s"))?QS.get("s"):"stroke";
+let SCORING=["stableford","ambrose"].includes(QS.get("s"))?QS.get("s"):"stroke";
+/* Viewing a saved past event: PAST holds it, the live board is parked in LIVE_STATE until "Back to live". */
+let PAST=null, LIVE_STATE=null, LIVE_SCORING=null, EVENTS=null;
 const THEME=QS.get("theme")==="light"?"light":"dark";
 if(THEME==="light")document.documentElement.classList.add("light");
 function href(sc,th){const q=new URLSearchParams();if(sc!=="stroke")q.set("s",sc);if(th==="light")q.set("theme","light");const x=q.toString();return "./"+(x?"?"+x:"")}
@@ -244,29 +256,29 @@ async function startStore(){
   }catch(e){liveFailed("Can't reach the live board right now. Saved on this phone only.")}
 }
 async function resync(){if(MODE!=="live")return;try{onRemoteChange(await fetchAll())}catch(e){}}
-function applyScoreEvent(ev){
+function applyScoreEvent(ev){if(PAST){LIVE_DIRTY=true;return}
   const r=ev.eventType==="DELETE"?ev.old:ev.new;const p=state.players.find(x=>x.id===r.player_id);if(!p||!r.hole)return;
   p.holes[r.hole-1]=ev.eventType==="DELETE"?null:r.strokes;rerender();
 }
-function applyPlayerEvent(ev){
+function applyPlayerEvent(ev){if(PAST){LIVE_DIRTY=true;return}
   if(ev.eventType==="DELETE"){state.players=state.players.filter(p=>p.id!==ev.old.id);rerender();return}
   const r=ev.new;let p=state.players.find(x=>x.id===r.id);
   if(!p){p={id:r.id,holes:blankHoles()};state.players.push(p)}
   p.name=r.name;p.hcp=r.hcp==null?null:Number(r.hcp);p.sort=r.sort;p.playing=r.playing!==false;
   state.players.sort((a,b)=>(a.sort||0)-(b.sort||0));rerender();
 }
-function applyTeamEvent(ev){
+function applyTeamEvent(ev){if(PAST){LIVE_DIRTY=true;return}
   if(ev.eventType==="DELETE"){state.teams=state.teams.filter(t=>t.id!==ev.old.id);rerender();return}
   const r=ev.new;let t=state.teams.find(x=>x.id===r.id);
   if(!t){t={id:r.id,holes:blankHoles()};state.teams.push(t)}
   t.name=r.name;t.members=r.members||[];t.sort=r.sort||0;
   state.teams.sort((a,b)=>(a.sort||0)-(b.sort||0));rerender();
 }
-function applyTeamScoreEvent(ev){
+function applyTeamScoreEvent(ev){if(PAST){LIVE_DIRTY=true;return}
   const r=ev.eventType==="DELETE"?ev.old:ev.new;const t=state.teams.find(x=>x.id===r.team_id);if(!t||!r.hole)return;
   t.holes[r.hole-1]=ev.eventType==="DELETE"?null:r.strokes;rerender();
 }
-function applySettingEvent(ev){const r=ev.new;if(ev.eventType!=="DELETE"&&r&&r.key==="team_size"){state.teamSize=+r.value||3;rerender()}}
+function applySettingEvent(ev){if(PAST){LIVE_DIRTY=true;return}const r=ev.new;if(ev.eventType!=="DELETE"&&r&&r.key==="team_size"){state.teamSize=+r.value||3;rerender()}}
 const timers={};
 function debounce(key,fn,ms=400){clearTimeout(timers[key]);timers[key]=setTimeout(fn,ms)}
 /* Writes retry until they land (patchy signal on the course). A newer edit to the same box replaces an older pending one. */
@@ -332,7 +344,9 @@ async function clearAllScores(){
   const{error}=await SB.from("scores").delete().gte("hole",1);warn(error);
   const r2=await SB.from("team_scores").delete().gte("hole",1);warn(r2.error);
 }
+let LIVE_DIRTY=false;
 function onRemoteChange(newState){
+  if(PAST){LIVE_STATE=newState;return}
   /* keep scores this phone hasn't managed to send yet */
   Object.values(pending).forEach(m=>{
     if(m.pid!=null){const p=newState.players.find(x=>x.id===m.pid);if(p)p.holes[m.i]=m.v}
@@ -445,7 +459,7 @@ function mark(score,par){
 function render(){
   if(view.name==="card"&&!state.players.find(p=>p.id===view.id))view={name:"board",id:null,edit:false};
   if(view.name==="team"&&!state.teams.find(t=>t.id===view.id))view={name:"board",id:null,edit:false};
-  if(view.name==="board")renderBoard();else if(view.name==="card")renderCard();else if(view.name==="team")renderTeamCard();else if(view.name==="teams")renderTeams();else renderSetup();
+  if(view.name==="board")renderBoard();else if(view.name==="card")renderCard();else if(view.name==="team")renderTeamCard();else if(view.name==="teams")renderTeams();else if(view.name==="past")renderPastList();else renderSetup();
 }
 const SUN='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
 const MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg>';
@@ -464,7 +478,7 @@ function renderBoard(){
   const rest=list.filter(x=>x.gross==null).sort((a,b)=>amb?(a.p.sort||0)-(b.p.sort||0):a.p.name.localeCompare(b.p.name,"en",{sensitivity:"base"}));
   let pos=0,last=null;scored.forEach((x,i)=>{if(key(x)!==last){pos=i+1;last=key(x)}x.pos=pos});
   scored.forEach(x=>x.label=(scored.filter(y=>y.pos===x.pos).length>1?"T":"")+x.pos);
-  scored.forEach(x=>{const m=posMemo[x.p.id];posMemo[x.p.id]=m&&m.pos!==x.pos?{pos:x.pos,mv:m.pos-x.pos,at:Date.now()}:m?Object.assign(m,{pos:x.pos}):{pos:x.pos,mv:0,at:0}});
+  if(!PAST)scored.forEach(x=>{const m=posMemo[x.p.id];posMemo[x.p.id]=m&&m.pos!==x.pos?{pos:x.pos,mv:m.pos-x.pos,at:Date.now()}:m?Object.assign(m,{pos:x.pos}):{pos:x.pos,mv:0,at:0}});
   const all=scored.concat(rest), order=all.map(x=>x.p.id);
   const who=x=>x.team
     ?`<span class="tm">${esc(x.p.name||"Team")}<span class="chev">›</span><span class="faces sm">${teamMembers(x.p).map(m=>avatar(m)).join("")}</span><small>${teamMembers(x.p).map(m=>esc(m.name)).join(", ")}</small></span>`
@@ -477,12 +491,13 @@ function renderBoard(){
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="${href(SCORING,other)}" aria-label="Switch to the ${other} version" title="Switch to the ${other} version">${THEME==="light"?MOON:SUN}</a></div>
     <p>${RULES[SCORING]}</p>
   </header>
+  ${PAST?`<div class="pastbar"><span>Past event · <b>${esc(PAST.name)}</b> · ${fmtDate(PAST.played_on)}</span><button type="button" data-closepast>Back to live</button></div>`:""}
   <section class="board" aria-label="Leaderboard">
     <div class="board-head"><h2>${amb?"Teams":"Leaderboard"}</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${list.length} started</span></div>
     ${amb&&!list.length?`<p class="note">No teams yet. Tap <b>Teams</b> below to pick them.</p>`:`<table class="tbl">
       <thead><tr><th>Pos</th><th>${amb?"Team":"Player"}</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>${sf?"Pts":"Net"}</th></tr></thead>
       <tbody>${all.map((x,i)=>{
-        const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty?0:(m=>m&&m.mv&&Date.now()-m.at<MOVE_MS?m.mv:0)(posMemo[x.p.id]), moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
+        const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty||PAST?0:(m=>m&&m.mv&&Date.now()-m.at<MOVE_MS?m.mv:0)(posMemo[x.p.id]), moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
         return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" ${x.team?`data-team="${x.p.id}"`:`data-open="${x.p.id}"`} tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
           <td class="pos">${empty?"–":x.label}${mv>0?`<span class="mv up" aria-label="up ${mv}">▲${mv}</span>`:mv<0?`<span class="mv dn" aria-label="down ${-mv}">▼${-mv}</span>`:""}</td>
           <td class="nm">${who(x)}</td>
@@ -493,8 +508,11 @@ function renderBoard(){
     </table>`}
     <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
   </section>
-  <div class="links">${amb?`<button class="btn" data-go="teams" type="button">Teams</button>`:""}<button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
-  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<a ${k===SCORING?'class="on" aria-current="page"':""} href="${href(k,THEME)}">${l}</a>`).join("")}</nav>`;
+  ${PAST?`<div class="links"><button class="btn sec" data-go="past" type="button">‹ Past events</button><button class="btn" type="button" data-closepast>Back to live</button></div>
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<button type="button" data-pastmode="${k}" class="${k===SCORING?"on":""}">${l}</button>`).join("")}</nav>`
+  :`<div class="links">${amb?`<button class="btn" data-go="teams" type="button">Teams</button>`:""}<button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<a ${k===SCORING?'class="on" aria-current="page"':""} href="${href(k,THEME)}">${l}</a>`).join("")}</nav>
+  <div class="links"><button class="btn sec" data-go="past" type="button">Past events</button></div>`}`;
   prevOrder=order;
 }
 function renderCard(){renderScorecard(state.players.find(x=>x.id===view.id),false)}
@@ -511,7 +529,7 @@ function renderScorecard(p,isTeam){
   const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole${i===CTP?" ctp":""}" id="hole-${i}">
       <span class="no">${i+1}</span>
       <span class="info"><b>Par ${h[1]} · ${h[0]} m · SI ${SI[i]}${(n=>n>0?` <span class="shot">+${n} shot${n>1?"s":""}</span>`:"")(shots(hcp,i))}</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
-      <input id="${IN}-${p.id}-${i}" ${isTeam?"data-thole":"data-hole"}="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
+      <input ${PAST?"disabled":""} id="${IN}-${p.id}-${i}" ${isTeam?"data-thole":"data-hole"}="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
     ${isTeam?`<span class="faces">${teamMembers(p).map(m=>avatar(m)).join("")}</span><div class="ttl"><h2>${esc(p.name||"Team")}</h2><p class="tform">${teamMembers(p).map(m=>esc(m.name)+" ("+(m.hcp==null?"no hcp":fmt(m.hcp))+")").join(", ")}</p><small>Team hcp ${fmt(hcp)} · ${COURSE.tees}</small></div></div>`
@@ -537,7 +555,10 @@ function renderSetup(){
     <p class="hint">Enter each player's handicap. Untick <b>Playing</b> to hide someone from the leaderboards without deleting him. Rename, add or remove players here. Removing a player deletes his card.</p>
     ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" data-id="${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${p.playing!==false?"checked":""}>Playing</label><button class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
     <form class="add" id="addForm"><input class="name" id="newName" placeholder="Add a player" autocomplete="off"><button class="btn" type="submit">Add</button></form>
-    <div class="links"><button class="btn sec" id="clearAll" type="button">Clear every scorecard</button></div>
+    <h3 class="sect">Finish the day</h3>
+    <p class="hint">Saves today's scores, handicaps and teams to <b>Past events</b>, then clears every scorecard and handicap ready for next time.</p>
+    <input id="evName" value="Palmer Colonial Classic" aria-label="Event name">
+    <div class="links"><button class="btn sec" id="clearAll" type="button">Save to Past events &amp; clear</button></div>
   </section>`;
 }
 
@@ -600,12 +621,78 @@ function renderTeams(){
   </section>`;
 }
 
+/* ---------- past events ---------- */
+const fmtDate=d=>{try{return new Date(d+"T00:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}catch(e){return d}};
+const FORMAT_NAME={stroke:"Stroke play",stableford:"Stableford",ambrose:"Ambrose"};
+function snapshot(){
+  const teamPlayed=state.teams.some(t=>t.holes.some(v=>v!=null));
+  return{players:state.players.map(p=>({id:p.id,name:p.name,hcp:p.hcp,playing:p.playing!==false,sort:p.sort,holes:p.holes.slice()})),
+    teams:state.teams.map(t=>({id:t.id,name:t.name,members:(t.members||[]).slice(),sort:t.sort,holes:t.holes.slice()})),
+    teamSize:state.teamSize||3, scoring:teamPlayed?"ambrose":SCORING};
+}
+async function finishEvent(name){
+  const any=state.players.some(p=>p.holes.some(v=>v!=null))||state.teams.some(t=>t.holes.some(v=>v!=null));
+  if(any){
+    const row={id:"e"+Date.now().toString(36),name,played_on:new Date().toLocaleDateString("en-CA"),data:snapshot()};
+    if(MODE==="live"){
+      let error=null;try{({error}=await SB.from("events").insert(row))}catch(e){error=e}
+      if(error){syncNote="Couldn't save to Past events, so nothing was cleared. Check signal and try again.";EVENTS=null;go("board");return}
+    }else{try{const k="wdde-golf-events";const a=JSON.parse(localStorage.getItem(k)||"[]");a.unshift(row);localStorage.setItem(k,JSON.stringify(a))}catch(e){}}
+    EVENTS=null;
+  }
+  state.players.forEach(p=>{if(p.hcp!=null){p.hcp=null;savePlayer(p)}});
+  await clearAllScores();
+  go(any?"past":"board");
+}
+async function loadEvents(){
+  if(MODE==="live"){
+    const{data,error}=await SB.from("events").select("id,name,played_on,created_at,data").order("played_on",{ascending:false}).order("created_at",{ascending:false});
+    EVENTS=error?[]:data;
+  }else{try{EVENTS=JSON.parse(localStorage.getItem("wdde-golf-events")||"[]")}catch(e){EVENTS=[]}}
+  if(view.name==="past")render();
+}
+function standings(st,mode){
+  const s0=state;state=st;
+  try{
+    const amb=mode==="ambrose",sf=mode==="stableford";
+    const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true},statsFor(t.holes,teamHcp(t))))
+                  :playingPlayers().map(p=>Object.assign({p},stats(p)));
+    return list.filter(x=>x.gross!=null).sort((a,b)=>sf?(b.pts-a.pts||a.thru-b.thru):(a.net-b.net||a.netExact-b.netExact||b.thru-a.thru));
+  }finally{state=s0}
+}
+function renderPastList(){
+  if(EVENTS==null)loadEvents();
+  $("app").innerHTML=`
+  <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Past events</h2><small>Saved when someone taps “Save to Past events &amp; clear”</small></div></div>
+  <section class="panel">
+    ${EVENTS==null?`<p class="note">Loading…</p>`:!EVENTS.length?`<p class="note">No past events yet. At the end of a day, go to <b>Handicaps &amp; players</b> and tap <b>Save to Past events &amp; clear</b>.</p>`
+    :EVENTS.map(ev=>{const m=ev.data.scoring||"stroke",w=standings(ev.data,m)[0];
+      const res=w?`${esc(w.p.name)} (${m==="stableford"?w.pts+" pts":toParTxt(w.net)+" net"})`:"no scores";
+      return `<button class="evcard" type="button" data-event="${ev.id}"><b>${esc(ev.name)}</b><span>${fmtDate(ev.played_on)} · ${FORMAT_NAME[m]}</span><span class="win">Winner: ${res}</span></button>`}).join("")}
+  </section>`;
+}
+function openPast(id){
+  const ev=(EVENTS||[]).find(x=>x.id===id);if(!ev)return;
+  LIVE_STATE=state;LIVE_SCORING=SCORING;PAST=ev;
+  const d=JSON.parse(JSON.stringify(ev.data));d.teams=d.teams||[];d.players.forEach(p=>{p.holes=p.holes||blankHoles()});d.teams.forEach(t=>{t.holes=t.holes||blankHoles()});
+  state=d;SCORING=d.scoring||"stroke";view={name:"board",id:null,edit:false};render();window.scrollTo(0,0);
+}
+function closePast(){
+  if(!PAST)return;
+  state=LIVE_STATE;SCORING=LIVE_SCORING;PAST=null;LIVE_STATE=null;
+  view={name:"board",id:null,edit:false};render();window.scrollTo(0,0);
+  if(LIVE_DIRTY){LIVE_DIRTY=false;resync()}
+}
+
 /* ---------- events ---------- */
-function go(name,id){view={name,id:id||null,edit:false};render();window.scrollTo(0,0)}
+function go(name,id){if(name==="past"&&PAST){state=LIVE_STATE;SCORING=LIVE_SCORING;PAST=null;LIVE_STATE=null;if(LIVE_DIRTY){LIVE_DIRTY=false;resync()}}view={name,id:id||null,edit:false};render();window.scrollTo(0,0)}
 document.addEventListener("click",e=>{
   const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
   const o=e.target.closest("[data-open]");if(o){go("card",o.dataset.open);return}
   const tm=e.target.closest("[data-team]");if(tm){go("team",tm.dataset.team);return}
+  if(e.target.closest("[data-closepast]")){closePast();return}
+  const pm=e.target.closest("[data-pastmode]");if(pm){SCORING=pm.dataset.pastmode;render();return}
+  const ev=e.target.closest("[data-event]");if(ev){openPast(ev.dataset.event);return}
   const sz=e.target.closest("[data-size]");if(sz){state.teamSize=+sz.dataset.size;saveSetting("team_size",state.teamSize);render();return}
   if(e.target.id==="autoTeams"){autoTeams(false);render();return}
   if(e.target.id==="randTeams"){autoTeams(true);render();return}
@@ -616,8 +703,8 @@ document.addEventListener("click",e=>{
     const id=d.dataset.del;state.players=state.players.filter(p=>p.id!==id);removePlayerFromStore(id);render();return}
   if(e.target.id==="clearAll"){
     const b=e.target;
-    if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to wipe all 18-hole cards";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Clear every scorecard"}},3000);return}
-    clearAllScores();render();
+    if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to save & clear";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Save to Past events & clear"}},3000);return}
+    b.disabled=true;b.textContent="Saving…";finishEvent(($("evName").value||"Golf day").trim());
   }
 });
 document.addEventListener("keydown",e=>{const o=e.target.closest&&e.target.closest("[data-open],[data-team]");if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();o.dataset.team?go("team",o.dataset.team):go("card",o.dataset.open)}});
@@ -628,6 +715,7 @@ document.addEventListener("change",e=>{
 });
 document.addEventListener("input",e=>{
   const el=e.target;
+  if(PAST)return;
   if(el.dataset.hole!=null&&view.name==="card"){
     const p=state.players.find(x=>x.id===view.id),i=+el.dataset.hole;
     p.holes[i]=num(el.value);saveHole(p,i);
