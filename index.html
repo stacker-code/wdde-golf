@@ -163,6 +163,15 @@ html.light .hole input::placeholder{color:#a3b5ab}
 .prow{grid-template-columns:1fr 4.2rem auto auto}
 .prow.assign{grid-template-columns:auto 1fr auto}
 .links .btn{flex:1}
+#finale{position:fixed;inset:0;z-index:50;background:rgba(5,12,9,.82);display:grid;place-items:center;padding:16px}
+#finale[hidden]{display:none}
+.fin-box{position:relative;width:100%;max-width:440px;background:var(--board);border:1px solid var(--flag);border-radius:16px;padding:18px 16px;display:grid;gap:10px}
+.fin-box h2{font-size:1.8rem;color:var(--flag)}
+.fin-x{position:absolute;top:8px;right:10px;background:transparent;border:0;color:var(--muted);font-size:1.6rem}
+.fin-row{display:grid;grid-template-columns:2.6rem auto 1fr;gap:10px;align-items:center;background:var(--row);border:1px solid var(--line);border-radius:12px;padding:10px}
+.fin-pos{font-family:var(--f-display);font-weight:900;font-size:1.3rem;text-align:center;border-radius:8px;padding:4px 0;color:#0b1a14}
+.fin-1 .fin-pos{background:var(--flag)}.fin-2 .fin-pos{background:#c7d0d4}.fin-3 .fin-pos{background:#c98d5a}
+.fin-who{min-width:0}.fin-who b{display:block;font-size:1.05rem}.fin-who small{display:block;color:var(--muted);font-size:.78rem}
 .pastbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--flag);color:var(--flag);background:color-mix(in srgb,var(--flag) 10%,transparent);font-size:.9rem}
 .pastbar b{color:var(--cream)}
 .pastbar button{flex:none;border:1px solid var(--flag);background:transparent;color:var(--flag);border-radius:8px;padding:7px 10px;font-weight:600}
@@ -196,7 +205,10 @@ const SUPABASE_ANON_KEY="sb_publishable_Xs5Fid2D8rkIvMr6lrC61w_AYP93zy7";
    updates within a second. Local mode: this phone's browser storage.
    Nothing outside this block touches storage.
    ============================================================ */
-const STORE_KEY="wdde-golf-v4";  // v4 = clean slate; older saves are wiped
+/* Test build (test/index.html) sets window.WDDE_TEST: phone-only storage, can delete past events, plays the end-of-round voice. */
+const TEST=!!window.WDDE_TEST, CAN_DELETE_EVENTS=TEST, END_AUDIO=TEST;
+const EVENTS_KEY=TEST?"wdde-golf-test-events":"wdde-golf-events";
+const STORE_KEY=TEST?"wdde-golf-test":"wdde-golf-v4";  // v4 = clean slate; older saves are wiped
 const DEFAULT_NAMES=["AB","Brocky","Don","Gilly","Joey","JT","Locky","Rocket","Shark","Wally"];
 const blankHoles=()=>Array(18).fill(null);
 let MODE="local", SB=null, syncNote="Saved on this phone only.";
@@ -491,7 +503,8 @@ function renderBoard(){
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="${href(SCORING,other)}" aria-label="Switch to the ${other} version" title="Switch to the ${other} version">${THEME==="light"?MOON:SUN}</a></div>
     <p>${RULES[SCORING]}</p>
   </header>
-  ${PAST?`<div class="pastbar"><span>Past event · <b>${esc(PAST.name)}</b> · ${fmtDate(PAST.played_on)}</span><button type="button" data-closepast>Back to live</button></div>`:""}
+  ${TEST?`<div class="pastbar"><span><b>TEST VERSION.</b> Scores stay on this phone only. Nothing here touches the real leaderboard.</span><button type="button" id="loadDemo">Load demo round</button></div>`:""}
+  ${PAST?`<div class="pastbar"><span>Past event · <b>${esc(PAST.name)}</b> · ${fmtDate(PAST.played_on)}</span><button type="button" data-closepast>Back to live</button></div>${CAN_DELETE_EVENTS?`<div class="links"><button class="btn sec" type="button" id="delEvent">Delete this event</button></div>`:""}`:""}
   <section class="board" aria-label="Leaderboard">
     <div class="board-head"><h2>${amb?"Teams":"Leaderboard"}</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${list.length} started</span></div>
     ${amb&&!list.length?`<p class="note">No teams yet. Tap <b>Teams</b> below to pick them.</p>`:`<table class="tbl">
@@ -621,6 +634,77 @@ function renderTeams(){
   </section>`;
 }
 
+/* ---------- end-of-day finale (test build) ----------
+   When the last outstanding score of the day goes in, that phone reads out third, second and first
+   (with names) in the announcer voice, and every phone shows the final results. */
+const CLIP_BASE=(TEST?"":"test/")+"audio/announce/";
+let AC=null; const CLIPS={};
+function audioCtx(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==="suspended")AC.resume();return AC}
+function clip(name){
+  if(!CLIPS[name])CLIPS[name]=fetch(CLIP_BASE+name+".mp3").then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(b=>new Promise((ok,no)=>audioCtx().decodeAudioData(b,ok,no))).catch(()=>null);
+  return CLIPS[name];
+}
+if(END_AUDIO){["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{if(audioCtx())["intro","third","third_last","second","first","win_team","win_one","and"].forEach(clip)},{passive:true}))}
+const nameClip=n=>"name_"+String(n||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function placeGroups(st){const g=[];st.forEach(x=>{const last=g[g.length-1];if(last&&last[0].pos===x.pos)last.push(x);else g.push([x])});return g}
+function peopleOf(group){return group.flatMap(x=>x.team?teamMembers(x.p).map(m=>m.name):[x.p.name])}
+function namesSeq(people){const out=[];people.forEach((n,i)=>{if(i&&i===people.length-1)out.push("and");out.push(nameClip(n))});return out}
+async function playSeq(list){
+  const ctx=audioCtx();if(!ctx)return;
+  const bufs=await Promise.all(list.map(x=>x==="PAUSE"?null:clip(x)));
+  let t=ctx.currentTime+0.15;
+  list.forEach((x,i)=>{if(x==="PAUSE"){t+=0.5;return}const b=bufs[i];if(!b)return;const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(t);t+=b.duration+0.06});
+}
+function finaleSeq(st){
+  const g=placeGroups(st);if(!g.length)return[];
+  const seq=["intro","PAUSE"];
+  if(g[2]){seq.push(g.length===3?"third_last":"third",...namesSeq(peopleOf(g[2])),"PAUSE")}
+  if(g[1]){seq.push("second",...namesSeq(peopleOf(g[1])),"PAUSE")}
+  const winners=peopleOf(g[0]);
+  seq.push("first",...namesSeq(winners),"PAUSE",winners.length>1?"win_team":"win_one");
+  return seq;
+}
+function fieldDone(){
+  const list=SCORING==="ambrose"?activeTeams():playingPlayers();
+  return list.length>0&&list.every(e=>e.holes.every(v=>v!=null));
+}
+let FINALE_SHOWN=false;
+function finaleCheck(fromInput){
+  if(!END_AUDIO||PAST)return;
+  if(!fieldDone()){FINALE_SHOWN=false;return}
+  if(FINALE_SHOWN)return;
+  FINALE_SHOWN=true;
+  const st=standings(state,SCORING);
+  if(fromInput)playSeq(finaleSeq(st));
+  showFinale(st);
+}
+function showFinale(st){
+  const sf=SCORING==="stableford", g=placeGroups(st).slice(0,3);
+  const label=["1st","2nd","3rd"], blurb=["Rose to the top of the shit heap","Less shit, but still shit","Useless bunch"];
+  const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${blurb[k]} · ${grp[0].gross} gross · ${sf?grp[0].pts+" pts":toParTxt(grp[0].net)+" net"}</small></span></div>`;
+  let el=$("finale");if(!el){el=document.createElement("div");el.id="finale";document.body.appendChild(el)}
+  el.innerHTML=`<div class="fin-box"><button class="fin-x" type="button" data-finclose aria-label="Close">×</button>
+    <div class="eyebrow">Palmer Colonial Classic · Final</div><h2>Final standings</h2>
+    ${g.map(row).join("")}
+    <div class="links"><button class="btn" type="button" data-finplay>▶ Play the call</button><button class="btn sec" type="button" data-finclose>Close</button></div></div>`;
+  el.hidden=false;
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-finclose]")){const el=$("finale");if(el)el.hidden=true;return}
+  if(e.target.closest("[data-finplay]")){audioCtx();playSeq(finaleSeq(standings(state,SCORING)));return}
+  if(e.target.id==="loadDemo"){loadDemo();return}
+});
+/* Test helper: a full pretend day up to hole 16, so the last holes can be played out on a phone. */
+function loadDemo(){
+  const H={p2:18,p3:4,p4:11,p5:6,p6:22,p7:16,p8:25,p9:12,p10:20};
+  let seed=7;const rnd=()=>{seed=(seed*1103515245+12345)%2147483648;return seed/2147483648};
+  const score=(par,hcp)=>{const r=rnd(),d=r<.12?-1:r<.5-hcp*.008?0:r<.82?1:r<.95?2:3;return Math.max(2,par+d)};
+  state.players.forEach(p=>{p.playing=p.id!=="p1";if(H[p.id]!=null)p.hcp=H[p.id];p.holes=blankHoles();if(p.playing)for(let i=0;i<16;i++)p.holes[i]=score(PAR[i],p.hcp||0)});
+  state.teamSize=3;autoTeams(false);
+  state.teams.forEach(t=>{t.holes=blankHoles();if(teamMembers(t).length)for(let i=0;i<16;i++)t.holes[i]=Math.max(2,PAR[i]+(rnd()<.3?-1:rnd()<.8?0:1))});
+  FINALE_SHOWN=false;saveLocal();go("board");
+}
+
 /* ---------- past events ---------- */
 const fmtDate=d=>{try{return new Date(d+"T00:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}catch(e){return d}};
 const FORMAT_NAME={stroke:"Stroke play",stableford:"Stableford",ambrose:"Ambrose"};
@@ -637,7 +721,7 @@ async function finishEvent(name){
     if(MODE==="live"){
       let error=null;try{({error}=await SB.from("events").insert(row))}catch(e){error=e}
       if(error){syncNote="Couldn't save to Past events, so nothing was cleared. Check signal and try again.";EVENTS=null;go("board");return}
-    }else{try{const k="wdde-golf-events";const a=JSON.parse(localStorage.getItem(k)||"[]");a.unshift(row);localStorage.setItem(k,JSON.stringify(a))}catch(e){}}
+    }else{try{const k=EVENTS_KEY;const a=JSON.parse(localStorage.getItem(k)||"[]");a.unshift(row);localStorage.setItem(k,JSON.stringify(a))}catch(e){}}
     EVENTS=null;
   }
   state.players.forEach(p=>{if(p.hcp!=null){p.hcp=null;savePlayer(p)}});
@@ -648,7 +732,7 @@ async function loadEvents(){
   if(MODE==="live"){
     const{data,error}=await SB.from("events").select("id,name,played_on,created_at,data").order("played_on",{ascending:false}).order("created_at",{ascending:false});
     EVENTS=error?[]:data;
-  }else{try{EVENTS=JSON.parse(localStorage.getItem("wdde-golf-events")||"[]")}catch(e){EVENTS=[]}}
+  }else{try{EVENTS=JSON.parse(localStorage.getItem(EVENTS_KEY)||"[]")}catch(e){EVENTS=[]}}
   if(view.name==="past")render();
 }
 function standings(st,mode){
@@ -657,7 +741,9 @@ function standings(st,mode){
     const amb=mode==="ambrose",sf=mode==="stableford";
     const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true},statsFor(t.holes,teamHcp(t))))
                   :playingPlayers().map(p=>Object.assign({p},stats(p)));
-    return list.filter(x=>x.gross!=null).sort((a,b)=>sf?(b.pts-a.pts||a.thru-b.thru):(a.net-b.net||a.netExact-b.netExact||b.thru-a.thru));
+    const out=list.filter(x=>x.gross!=null).sort((a,b)=>sf?(b.pts-a.pts||a.thru-b.thru):(a.net-b.net||a.netExact-b.netExact||b.thru-a.thru));
+    const key=x=>sf?-x.pts:x.net;let pos=0,last=null;out.forEach((x,i)=>{if(key(x)!==last){pos=i+1;last=key(x)}x.pos=pos}); /* ties share a place */
+    return out;
   }finally{state=s0}
 }
 function renderPastList(){
@@ -677,6 +763,12 @@ function openPast(id){
   const d=JSON.parse(JSON.stringify(ev.data));d.teams=d.teams||[];d.players.forEach(p=>{p.holes=p.holes||blankHoles()});d.teams.forEach(t=>{t.holes=t.holes||blankHoles()});
   state=d;SCORING=d.scoring||"stroke";view={name:"board",id:null,edit:false};render();window.scrollTo(0,0);
 }
+async function deletePast(){
+  const id=PAST.id;
+  if(MODE==="live"){const{error}=await SB.from("events").delete().eq("id",id);if(error){syncNote="Couldn't delete that event.";render();return}}
+  else{try{localStorage.setItem(EVENTS_KEY,JSON.stringify((JSON.parse(localStorage.getItem(EVENTS_KEY)||"[]")).filter(e=>e.id!==id)))}catch(e){}}
+  EVENTS=null;go("past");
+}
 function closePast(){
   if(!PAST)return;
   state=LIVE_STATE;SCORING=LIVE_SCORING;PAST=null;LIVE_STATE=null;
@@ -691,6 +783,7 @@ document.addEventListener("click",e=>{
   const o=e.target.closest("[data-open]");if(o){go("card",o.dataset.open);return}
   const tm=e.target.closest("[data-team]");if(tm){go("team",tm.dataset.team);return}
   if(e.target.closest("[data-closepast]")){closePast();return}
+  if(e.target.id==="delEvent"){const b=e.target;if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to delete for good";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Delete this event"}},3000);return}deletePast();return}
   const pm=e.target.closest("[data-pastmode]");if(pm){SCORING=pm.dataset.pastmode;render();return}
   const ev=e.target.closest("[data-event]");if(ev){openPast(ev.dataset.event);return}
   const sz=e.target.closest("[data-size]");if(sz){state.teamSize=+sz.dataset.size;saveSetting("team_size",state.teamSize);render();return}
@@ -719,12 +812,14 @@ document.addEventListener("input",e=>{
   if(el.dataset.hole!=null&&view.name==="card"){
     const p=state.players.find(x=>x.id===view.id),i=+el.dataset.hole;
     p.holes[i]=num(el.value);saveHole(p,i);
+    finaleCheck(true);
     if(el.value.length>=1&&p.holes[i]!=null&&p.holes[i]>1&&i<17){const nx=$(`s-${p.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
     refreshCardNumbers();return;
   }
   if(el.dataset.thole!=null&&view.name==="team"){
     const t=state.teams.find(x=>x.id===view.id),i=+el.dataset.thole;
     t.holes[i]=num(el.value);saveTeamHole(t,i);
+    finaleCheck(true);
     if(el.value.length>=1&&t.holes[i]!=null&&t.holes[i]>1&&i<17){const nx=$(`ts-${t.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
     rerender();return;
   }
@@ -743,6 +838,7 @@ function refreshCardNumbers(){rerender()}
 function rerender(){
   const a=document.activeElement, id=a&&a.id&&a.tagName==="INPUT"?a.id:null, val=id?a.value:null, y=window.scrollY;
   render();window.scrollTo(0,y);
+  finaleCheck(false);
   if(id){const el=$(id);if(el){el.value=val;el.focus({preventScroll:true})}}
 }
 render();startStore();
