@@ -394,7 +394,7 @@ function renderBoard(){
           <td class="thru">${x.thru===18?"F":x.thru||"–"}</td>
           <td><span class="${toParCls(x.toPar)}">${fmt(x.gross)}</span></td>
           <td>${x.p.hcp==null?"–":fmt(x.p.hcp)}</td>
-          <td class="net">${x.pts}</td></tr>`}).join("")}</tbody>
+          <td class="net">${x.gross==null?"–":x.pts}</td></tr>`}).join("")}</tbody>
     </table>
     <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
   </section>
