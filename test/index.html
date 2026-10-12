@@ -449,7 +449,9 @@ function holePts(holes,hcp,i){const v=holes[i];return v==null?null:Math.max(0,2+
 const playingPlayers=()=>state.players.filter(p=>p.playing!==false);
 /* Ambrose team handicap: combined handicaps divided by (2 x players in the team): 2 players /4, 3 players /6, 4 players /8. */
 function teamMembers(t){return (t.members||[]).map(id=>state.players.find(p=>p.id===id)).filter(p=>p&&p.playing!==false)}
-function teamHcp(t){const m=teamMembers(t);if(!m.length)return 0;return Math.round(m.reduce((a,p)=>a+(p.hcp||0),0)/(2*m.length)*10)/10}
+/* Straight Ambrose (Steve, 12 Oct): no team handicap. Set AMBROSE_HCP=true to bring back combined ÷ (2 × players). */
+const AMBROSE_HCP=false;
+function teamHcp(t){if(!AMBROSE_HCP)return 0;const m=teamMembers(t);if(!m.length)return 0;return Math.round(m.reduce((a,p)=>a+(p.hcp||0),0)/(2*m.length)*10)/10}
 function stats(p){return statsFor(p.holes,p.hcp)}
 function statsFor(holes,hcp){
   const p={holes,hcp};
@@ -479,12 +481,12 @@ const MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="
 const RULES={
   stroke:'Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index, "SI" on each hole), like a normal card. Tap a player to see or enter his card.',
   stableford:'<b>Stableford.</b> Most points wins. Each hole: net par 2 points, net birdie 3, net bogey 1, worse 0. Handicap shots come on the hardest holes ("SI"). Just type your real score; if you pick up, enter any big number. Tap a player to see or enter his card.',
-  ambrose:'<b>Ambrose.</b> Everyone hits, the team picks the best shot and all play from there. One team score per hole. Team handicap = combined handicaps ÷ (2 × players), e.g. three players off 10, 15 and 20 = 45 ÷ 6 = 7.5. Lowest net wins. Tap a team to enter its scores.'
+  ambrose:'<b>Ambrose.</b> Everyone hits, the team picks the best shot and all play from there. One team score per hole, no handicaps. Lowest score wins. Tap a team to enter its scores.'
 };
 function activeTeams(){return state.teams.filter(t=>teamMembers(t).length).sort((a,b)=>(a.sort||0)-(b.sort||0))}
 function renderBoard(){
   const amb=SCORING==="ambrose", sf=SCORING==="stableford";
-  const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true,hcpShown:teamHcp(t)},statsFor(t.holes,teamHcp(t))))
+  const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true,hcpShown:AMBROSE_HCP?teamHcp(t):null},statsFor(t.holes,teamHcp(t))))
                 :playingPlayers().map(p=>Object.assign({p,hcpShown:p.hcp},stats(p)));
   const key=x=>sf?-x.pts:x.net;
   const scored=list.filter(x=>x.gross!=null).sort((a,b)=>key(a)-key(b)||(sf?a.thru-b.thru:(a.netExact-b.netExact||b.thru-a.thru)));
@@ -509,7 +511,7 @@ function renderBoard(){
   <section class="board" aria-label="Leaderboard">
     <div class="board-head"><h2>${amb?"Teams":"Leaderboard"}</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${list.length} started</span></div>
     ${amb&&!list.length?`<p class="note">No teams yet. Tap <b>Teams</b> below to pick them.</p>`:`<table class="tbl">
-      <thead><tr><th>Pos</th><th>${amb?"Team":"Player"}</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>${sf?"Pts":"Net"}</th></tr></thead>
+      <thead><tr><th>Pos</th><th>${amb?"Team":"Player"}</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>${sf?"Pts":amb&&!AMBROSE_HCP?"Score":"Net"}</th></tr></thead>
       <tbody>${all.map((x,i)=>{
         const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty||PAST?0:(m=>m&&m.mv&&Date.now()-m.at<MOVE_MS?m.mv:0)(posMemo[x.p.id]), moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
         return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" ${x.team?`data-team="${x.p.id}"`:`data-open="${x.p.id}"`} tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
@@ -546,7 +548,7 @@ function renderScorecard(p,isTeam){
       <input ${PAST?"disabled":""} id="${IN}-${p.id}-${i}" ${isTeam?"data-thole":"data-hole"}="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
-    ${isTeam?`<span class="faces">${teamMembers(p).map(m=>avatar(m)).join("")}</span><div class="ttl"><h2>${esc(p.name||"Team")}</h2><p class="tform">${teamMembers(p).map(m=>esc(m.name)+" ("+(m.hcp==null?"no hcp":fmt(m.hcp))+")").join(", ")}</p><small>Team hcp ${fmt(hcp)} · ${COURSE.tees}</small></div></div>`
+    ${isTeam?`<span class="faces">${teamMembers(p).map(m=>avatar(m)).join("")}</span><div class="ttl"><h2>${esc(p.name||"Team")}</h2><p class="tform">${teamMembers(p).map(m=>esc(m.name)+(AMBROSE_HCP?" ("+(m.hcp==null?"no hcp":fmt(m.hcp))+")":"")).join(", ")}</p><small>${AMBROSE_HCP?"Team hcp "+fmt(hcp)+" · ":""}${COURSE.tees}</small></div></div>`
     :`${avatar(p,"lg")}<div class="ttl"><h2>${esc(p.name||"(no name)")}</h2>${BIOS[p.id]?`<p class="tform"><b>Form</b> ${esc(BIOS[p.id])}</p>`:""}<small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>`}
   <div class="sum">
     <div><b>${s.thru===18?"F":s.thru}</b><span>Thru</span></div>
@@ -629,7 +631,7 @@ function renderTeams(){
     <div class="links"><button class="btn" id="autoTeams" type="button">Make even teams</button><button class="btn sec" id="randTeams" type="button">Randomise</button></div>
     <p class="hint"><b>Make even teams</b> finds the split where the team handicaps are as close together as possible. <b>Randomise</b> draws them out of a hat. Or pick each player's team below. Team handicaps update by themselves.</p>
     <h3 class="sect">Teams</h3>
-    ${teams.map(t=>`<div class="tcard"><input class="name" data-tname="${t.id}" value="${esc(t.name)}" aria-label="Team name"><div class="who">${teamMembers(t).map(m=>esc(m.name)).join(", ")||"No players yet"} · Team hcp <b>${fmt(teamHcp(t))}</b></div></div>`).join("")}
+    ${teams.map(t=>`<div class="tcard"><input class="name" data-tname="${t.id}" value="${esc(t.name)}" aria-label="Team name"><div class="who">${teamMembers(t).map(m=>esc(m.name)).join(", ")||"No players yet"}${AMBROSE_HCP?` · Team hcp <b>${fmt(teamHcp(t))}</b>`:""}</div></div>`).join("")}
     <h3 class="sect">Who's in which team</h3>
     ${playingPlayers().map(p=>`<div class="prow assign">${avatar(p)}<span>${esc(p.name)} <small class="hint">(${p.hcp==null?"no hcp":fmt(p.hcp)})</small></span><select data-assign="${p.id}" aria-label="Team for ${esc(p.name)}"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}" ${teamOf(p.id)===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div>`).join("")}
   </section>`;
@@ -682,7 +684,7 @@ function finaleCheck(fromInput){
 function showFinale(st){
   const sf=SCORING==="stableford", g=placeGroups(st).slice(0,3);
   const label=["1st","2nd","3rd"], blurb=["Rose to the top of the shit heap","Less shit, but still shit","Useless bunch"];
-  const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${blurb[k]} · ${grp[0].gross} gross · ${sf?grp[0].pts+" pts":toParTxt(grp[0].net)+" net"}</small></span></div>`;
+  const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${blurb[k]} · ${grp[0].gross} gross · ${sf?grp[0].pts+" pts":SCORING==="ambrose"&&!AMBROSE_HCP?toParTxt(grp[0].net):toParTxt(grp[0].net)+" net"}</small></span></div>`;
   let el=$("finale");if(!el){el=document.createElement("div");el.id="finale";document.body.appendChild(el)}
   el.innerHTML=`<div class="fin-box"><button class="fin-x" type="button" data-finclose aria-label="Close">×</button>
     <div class="eyebrow">Palmer Colonial Classic · Final</div><h2>Final standings</h2>
@@ -701,7 +703,8 @@ function loadDemo(){
   let seed=7;const rnd=()=>{seed=(seed*1103515245+12345)%2147483648;return seed/2147483648};
   const score=(par,hcp)=>{const r=rnd(),d=r<.12?-1:r<.5-hcp*.008?0:r<.82?1:r<.95?2:3;return Math.max(2,par+d)};
   state.players.forEach(p=>{p.playing=p.id!=="p1";if(H[p.id]!=null)p.hcp=H[p.id];p.holes=blankHoles();if(p.playing)for(let i=0;i<16;i++)p.holes[i]=score(PAR[i],p.hcp||0)});
-  state.teamSize=3;autoTeams(false);
+  state.teamSize=3;ensureTeams(3);const DAY={t1:["p3","p4","p8"],t2:["p7","p6","p2"],t3:["p9","p10","p5"]}; /* the real teams for 16 Oct */
+  state.teams.forEach(t=>{t.members=DAY[t.id]||[]});
   state.teams.forEach(t=>{t.holes=blankHoles();if(teamMembers(t).length)for(let i=0;i<16;i++)t.holes[i]=Math.max(2,PAR[i]+(rnd()<.3?-1:rnd()<.8?0:1))});
   FINALE_SHOWN=false;saveLocal();go("board");
 }
