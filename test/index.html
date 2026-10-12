@@ -704,8 +704,8 @@ function finaleCheck(fromInput){
 }
 function showFinale(st){
   const sf=SCORING==="stableford", g=placeGroups(st).slice(0,3);
-  const label=["1st","2nd","3rd"], blurb=["Rose to the top of the shit heap","Less shit, but still shit","Useless bunch"];
-  const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${blurb[k]} · ${grp[0].gross} gross · ${sf?grp[0].pts+" pts":SCORING==="ambrose"&&!AMBROSE_HCP?toParTxt(grp[0].net):toParTxt(grp[0].net)+" net"}</small></span></div>`;
+  const label=["1st","2nd","3rd"];
+  const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${grp[0].gross} gross · ${sf?grp[0].pts+" pts":SCORING==="ambrose"&&!AMBROSE_HCP?toParTxt(grp[0].net):toParTxt(grp[0].net)+" net"}</small></span></div>`;
   let el=$("finale");if(!el){el=document.createElement("div");el.id="finale";document.body.appendChild(el)}
   el.innerHTML=`<div class="fin-box"><button class="fin-x" type="button" data-finclose aria-label="Close">×</button>
     <div class="eyebrow">Palmer Colonial 3-Man Ambrose · Final</div><h2>Final standings</h2>
