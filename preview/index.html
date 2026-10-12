@@ -1,0 +1,880 @@
+<!doctype html><html><head><meta charset=utf8><meta property="og:type" content="website">
+<meta property="og:title" content="Palmer Colonial 3-Man Ambrose · WDDE Club">
+<meta property="og:description" content="Where the greens break both ways. Live leaderboard: tap to enter scores.">
+<meta property="og:image" content="https://stacker-code.github.io/wdde-golf/og2.jpg">
+<meta property="og:image:width" content="800">
+<meta property="og:image:height" content="420">
+<meta property="og:url" content="https://stacker-code.github.io/wdde-golf/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>WDDE Golf Day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one column, three views. Home = clubhouse leaderboard board. Tap a player = his scorecard (scores save as you type). Setup = handicaps and players. Single dark theme by choice. */
+:root{
+  color-scheme:dark;
+  --bg:#0b1a14; --board:#10291f; --row:#14322a; --line:#21483b;
+  --cream:#efe9d6; --muted:#9bb5a8; --flag:#f2c230; --red:#e56a5a; --green:#5ed39b; --blue:#7fb4e8;
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--cream);font-family:var(--f-body);font-size:15px;line-height:1.4}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px 56px}
+header{padding-block:20px 12px;display:grid;gap:2px}
+.eyebrow{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--flag)}
+h1{font-family:var(--f-display);font-weight:900;font-size:2.3rem;line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.25rem;margin:0;letter-spacing:.06em;text-transform:uppercase}
+header p{margin:4px 0 0;color:var(--muted);font-size:.88rem}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.brand>div{display:grid;gap:2px;min-width:0}
+header .sub{color:var(--muted)}
+.brand h1{font-size:clamp(1rem,4.9vw,2rem);line-height:1;white-space:nowrap}
+header .tagline{text-align:center;margin:4px 0 0;font-style:italic;color:var(--flag);font-size:clamp(.9rem,3.6vw,1.05rem)}
+.logo{width:clamp(68px,19vw,104px);height:auto;flex:none;display:block}
+.logo .fig{fill:var(--cream)}
+.logo .gap{fill:var(--bg)}
+.logo .txt{fill:var(--bg);font-family:var(--f-display);font-weight:900}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,.lbrow:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
+/* board */
+.board{background:var(--board);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.board-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.board-head span{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.tbl th{font-family:var(--f-mono);font-weight:500;font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:right;padding:8px 8px}
+.tbl th:nth-child(2){text-align:left}
+.tbl td{padding:11px 8px;border-top:1px solid var(--line);text-align:right;font-family:var(--f-mono);font-size:.92rem}
+.tbl td.pos{width:2.5rem;text-align:center;font-weight:600;color:var(--muted)}
+.tbl td.nm{text-align:left;font-family:var(--f-body);font-weight:600;font-size:1rem;color:var(--cream)}
+.tbl td.nm .chev{color:var(--muted);margin-left:4px;font-weight:400}
+.tbl td.net{font-weight:600;font-size:1.08rem}
+.tbl td.thru{color:var(--muted);font-size:.8rem}
+.lbrow{cursor:pointer}
+.lbrow:active{background:var(--row)}
+tr.lead td.pos{color:var(--bg);background:var(--flag)}
+tr.lead td.net{color:var(--flag)}
+tr.p2 td.pos{color:#0b1a14;background:#c7d0d4}
+tr.p3 td.pos{color:#0b1a14;background:#c98d5a}
+td.pos .mv{display:block;font-size:.62rem;line-height:1.1;margin-top:2px;font-weight:600}
+td.pos .mv.up{color:var(--green)} td.pos .mv.dn{color:var(--red)}
+tr.lead td.pos .mv,tr.p2 td.pos .mv,tr.p3 td.pos .mv{color:#0b1a14}
+header p.ctpnote{margin:8px 0 0;display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:5px 10px;border-radius:999px;border:1px solid var(--flag);color:var(--flag);font-size:.82rem;font-weight:600}
+.hole.ctp{border-color:var(--flag);box-shadow:inset 3px 0 0 var(--flag)}
+.hole .ctpb{display:inline-block;margin-top:2px;font-size:.72rem;font-weight:600;color:var(--flag);text-transform:uppercase;letter-spacing:.06em}
+.strip th.ctp{color:var(--flag);background:color-mix(in srgb,var(--flag) 18%,var(--board))}
+tr.empty td{color:var(--muted)} tr.empty td.nm{color:var(--muted);font-weight:500}
+tr.moved{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:color-mix(in srgb,var(--flag) 25%,transparent)}to{background:transparent}}
+.sync{font-weight:600;color:var(--muted)} .sync.live{color:var(--green)}
+.board-foot{padding:8px 14px;font-size:.75rem;color:var(--muted);border-top:1px solid var(--line)}
+.under{color:var(--green)} .over{color:var(--red)}
+.links{display:flex;gap:8px;margin-top:14px}
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:600;background:var(--flag);color:var(--bg)}
+.btn.sec{background:transparent;color:var(--cream);border:1px solid var(--line)}
+.btn.danger{background:var(--red);color:var(--bg)}
+/* top bar for inner views */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.bar .back{background:transparent;border:1px solid var(--line);color:var(--cream);border-radius:10px;padding:8px 12px;font-weight:600}
+.bar .ttl{flex:1;min-width:0}
+.bar .ttl h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .ttl .tform{margin:2px 0 3px;font-style:italic;font-size:.84rem;line-height:1.3;color:var(--cream)}
+.bar .ttl .tform b{font-style:normal;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--flag);margin-right:4px}
+.bar .ttl small{display:block;font-family:var(--f-mono);font-size:.7rem;color:var(--muted)}
+/* card summary */
+.sum{margin-bottom:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;background:var(--board);border:1px solid var(--line);border-radius:12px;padding:10px 6px}
+.sum b{display:block;font-family:var(--f-mono);font-size:1.25rem;font-variant-numeric:tabular-nums}
+.sum span{font-size:.62rem;font-family:var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tip{margin-block:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--flag);color:var(--flag);background:color-mix(in srgb,var(--flag) 8%,transparent);font-size:.9rem}
+/* strip */
+.strip-wrap{overflow:hidden;margin-bottom:12px;border:1px solid var(--line);border-radius:10px}
+.strip{border-collapse:collapse;table-layout:fixed;width:100%;font-family:var(--f-mono);font-size:.7rem;font-variant-numeric:tabular-nums}
+.strip th,.strip td{padding:5px 0;text-align:center;border-left:1px solid var(--line);overflow:hidden}
+.strip .mk{min-width:1.2rem;height:1.2rem}
+.strip th:first-child,.strip td:first-child{border-left:0;width:2.6rem;text-align:left;padding-left:6px;color:var(--muted);font-weight:500}
+.strip thead th{color:var(--muted);font-weight:500;background:var(--board)}
+.strip th:last-child,.strip td:last-child{width:2.2rem}
+.strip td.tot{color:var(--cream);font-weight:600;background:var(--board)}
+.strip td.s{cursor:pointer}
+/* score marks */
+.mk{display:inline-grid;place-items:center;min-width:1.5rem;height:1.5rem;line-height:1}
+.mk.birdie{border:1.5px solid var(--green);border-radius:50%;color:var(--green)}
+.mk.eagle{border:3px double var(--green);border-radius:50%;color:var(--green)}
+.mk.bogey{border:1.5px solid var(--muted)}
+.mk.dbl{border:3px double var(--red);color:var(--red)}
+/* holes */
+.nine{display:grid;gap:6px}
+.nine h3{font-family:var(--f-display);font-weight:700;font-size:1rem;letter-spacing:.08em;text-transform:uppercase;margin:14px 0 2px;color:var(--muted)}
+.hole{display:grid;grid-template-columns:2.4rem 1fr 4.2rem;gap:10px;align-items:center;background:var(--row);border:1px solid var(--line);border-radius:10px;padding:8px 10px;scroll-margin-top:90px}
+.hole .no{font-family:var(--f-display);font-weight:900;font-size:1.6rem;text-align:center;line-height:1}
+.hole .info{min-width:0;display:grid;gap:1px}
+.hole .info b{font-family:var(--f-mono);font-size:.8rem;font-weight:600;color:var(--flag)}
+.hole .info span{font-size:.82rem;color:var(--muted)}
+.hole input{font:inherit;font-family:var(--f-mono);font-size:1.3rem;font-weight:600;text-align:center;width:100%;padding:8px 4px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream)}
+.hole input:disabled{background:transparent;border-color:transparent;color:var(--cream);opacity:1;-webkit-text-fill-color:var(--cream)}
+.hole input::placeholder{color:#4f6e61}
+.subt{display:flex;justify-content:space-between;padding:8px 12px;font-family:var(--f-mono);font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+.subt b{color:var(--cream)}
+/* setup */
+.prow{display:grid;grid-template-columns:1fr 5rem auto;gap:8px;align-items:center;background:var(--row);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.panel{display:grid;gap:8px}
+.hint{margin:0 0 4px;color:var(--muted);font-size:.85rem}
+.prow input,.add input{font:inherit;font-family:var(--f-mono);font-size:1.1rem;font-weight:600;text-align:center;width:100%;padding:8px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream)}
+input.name{text-align:left;font-family:var(--f-body);font-size:1rem;font-weight:500}
+.x{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;min-width:2.4rem;height:2.4rem;font-size:1.1rem}
+.x.confirm{color:var(--bg);background:var(--red);border-color:var(--red);padding:0 10px;font-size:.8rem;font-weight:600}
+.add{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:4px}
+@media (prefers-reduced-motion:reduce){tr.moved{animation:none}}
+.course{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mode{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);color:var(--muted);background:var(--board)}
+.nmw{display:flex;align-items:center;gap:8px;min-width:0}
+.av{flex:none;width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid var(--flag);background:var(--row);display:inline-grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:.85rem;letter-spacing:.02em;color:var(--flag);overflow:hidden}
+.av.lg{width:52px;height:52px;font-size:1.3rem;border-width:2.5px}
+.bar .av.lg{margin-left:2px}
+.form{margin:0 0 14px;padding:10px 12px;border-left:3px solid var(--flag);background:var(--board);border-radius:8px;font-style:italic;font-size:.95rem;color:var(--cream)}
+.form b{display:block;font-style:normal;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--flag);margin-bottom:2px}
+.hole .info b .shot{color:var(--green);font-weight:600;white-space:nowrap}
+.scoring{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.9rem;color:var(--muted)}
+.scoring a{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--cream);text-decoration:none;font-weight:600}
+.scoring a.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
+html.light{color-scheme:light;--bg:#ffffff;--board:#f4f8f5;--row:#ffffff;--line:#d6e3db;--cream:#12271e;--muted:#5b7468;--flag:#b8860b;--red:#c4412e;--green:#1d8a56;--blue:#2f6fae}
+html.light .board-head{background:#14322a;border-bottom-color:#14322a}
+html.light .board-head h2{color:#fff} html.light .board-head span{color:#b9d3c6}
+html.light tr.lead td.pos,html.light .btn{color:#fff}
+html.light .btn.sec{color:var(--cream)}
+html.light .hole{box-shadow:0 1px 2px rgba(18,39,30,.06)}
+html.light .hole input::placeholder{color:#a3b5ab}
+.faces{display:flex;flex:none}.faces .av{margin-left:-9px;box-shadow:0 0 0 2px var(--board)}.faces .av:first-child{margin-left:0}
+.tm{display:block;min-width:0}.tm small{display:block;font-size:.72rem;line-height:1.25;color:var(--muted);font-weight:500;margin-top:2px}
+.faces.sm{margin:4px 0 0}.faces.sm .av{width:24px;height:24px;font-size:.7rem;border-width:1.5px;margin-left:-6px}.faces.sm .av:first-child{margin-left:0}
+.seg{display:flex;gap:6px}.seg button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--cream);font-weight:600}.seg button.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
+.tcard{background:var(--row);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:6px}
+.tcard input.name{font:inherit;font-weight:600;width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream)}
+.tcard .who{font-size:.88rem;color:var(--muted)}
+.prow select{font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream);max-width:9.5rem}
+.chk{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);white-space:nowrap}
+.chk input{width:1.2rem;height:1.2rem;accent-color:var(--flag)}
+.prow.off input.name{opacity:.45}
+.sect{font-family:var(--f-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 2px;font-size:1rem}
+.note{color:var(--muted);font-size:.9rem;padding:14px;text-align:center}
+.prow{grid-template-columns:1fr 4.2rem auto auto}
+.prow.assign{grid-template-columns:auto 1fr auto}
+.links .btn{flex:1}
+.btn.dispute{background:transparent;color:var(--red);border:1px solid var(--red)}
+#ruling{position:fixed;inset:0;z-index:60;background:#b3261e;color:#fff;display:grid;place-content:center;gap:18px;padding:24px;text-align:center;cursor:pointer;animation:rul .25s ease-out}
+#ruling[hidden]{display:none}
+.rul-head{font-family:var(--f-mono);letter-spacing:.2em;text-transform:uppercase;font-size:.85rem;opacity:.85}
+.rul-body{font-family:var(--f-display);font-weight:900;font-size:clamp(2.6rem,13vw,5.5rem);line-height:.95;text-transform:uppercase}
+.rul-foot{font-size:.9rem;opacity:.85}
+@keyframes rul{from{transform:scale(1.15);opacity:0}to{transform:none;opacity:1}}
+button:disabled,select:disabled,input:disabled+*{opacity:.45;cursor:not-allowed}
+#finale{position:fixed;inset:0;z-index:50;background:rgba(5,12,9,.82);display:grid;place-items:center;padding:16px}
+#finale[hidden]{display:none}
+.fin-box{position:relative;width:100%;max-width:440px;background:var(--board);border:1px solid var(--flag);border-radius:16px;padding:18px 16px;display:grid;gap:10px}
+.fin-box h2{font-size:1.8rem;color:var(--flag)}
+.fin-x{position:absolute;top:8px;right:10px;background:transparent;border:0;color:var(--muted);font-size:1.6rem}
+.fin-row{display:grid;grid-template-columns:2.6rem auto 1fr;gap:10px;align-items:center;background:var(--row);border:1px solid var(--line);border-radius:12px;padding:10px}
+.fin-pos{font-family:var(--f-display);font-weight:900;font-size:1.3rem;text-align:center;border-radius:8px;padding:4px 0;color:#0b1a14}
+.fin-1 .fin-pos{background:var(--flag)}.fin-2 .fin-pos{background:#c7d0d4}.fin-3 .fin-pos{background:#c98d5a}
+.fin-who{min-width:0}.fin-who b{display:block;font-size:1.05rem}.fin-who small{display:block;color:var(--muted);font-size:.78rem}
+.pastbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--flag);color:var(--flag);background:color-mix(in srgb,var(--flag) 10%,transparent);font-size:.9rem}
+.pastbar b{color:var(--cream)}
+.pastbar button{flex:none;border:1px solid var(--flag);background:transparent;color:var(--flag);border-radius:8px;padding:7px 10px;font-weight:600}
+.evcard{display:block;width:100%;text-align:left;background:var(--row);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--cream)}
+.evcard b{display:block;font-size:1.05rem}
+.evcard span{display:block;color:var(--muted);font-size:.85rem;margin-top:2px}
+.evcard .win{color:var(--flag);font-weight:600}
+.scoring button{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--cream);background:transparent;font-weight:600;white-space:nowrap}
+.scoring button.on{background:var(--flag);border-color:var(--flag);color:var(--bg)}
+#evName{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--cream)}
+.scoring{flex-wrap:wrap}.scoring span{width:100%;text-align:center}.scoring a{white-space:nowrap}
+</style>
+
+<div class="wrap" id="app"></div>
+<script>window.WDDE_TEST=true;window.WDDE_PREVIEW=true;window.WDDE_AUDIO_BASE="../test/audio/announce/"</script>
+
+<script>
+/* ============================================================
+   CONFIG — paste your two Supabase values here.
+   Supabase dashboard > Project Settings > API Keys (older projects: Settings > API):
+     SUPABASE_URL      = the Project URL, e.g. "https://abcdefgh.supabase.co"
+     SUPABASE_ANON_KEY = the "anon public" key (eyJ...) or the "Publishable" key (sb_publishable_...)
+   Leave both blank and the page runs on this phone only.
+   ============================================================ */
+const SUPABASE_URL="";
+const SUPABASE_ANON_KEY="";
+
+/* ============================================================
+   STORE — the only place that reads or writes data.
+   Live mode: Supabase tables "players" (id, name, hcp, sort) and
+   "scores" (player_id, hole, strokes), with realtime so every phone
+   updates within a second. Local mode: this phone's browser storage.
+   Nothing outside this block touches storage.
+   ============================================================ */
+/* Test build (test/index.html) sets window.WDDE_TEST: phone-only storage, can delete past events, plays the end-of-round voice. */
+const TEST=!!window.WDDE_TEST, PREVIEW=!!window.WDDE_PREVIEW, CAN_DELETE_EVENTS=TEST, END_AUDIO=TEST;
+const EVENTS_KEY=PREVIEW?"wdde-golf-preview-events":TEST?"wdde-golf-test-events":"wdde-golf-events";
+const STORE_KEY=PREVIEW?"wdde-golf-preview":TEST?"wdde-golf-test":"wdde-golf-v4";  // v4 = clean slate; older saves are wiped
+const DEFAULT_NAMES=["AB","Brocky","Don","Gilly","Joey","JT","Locky","Rocket","Shark","Wally"];
+const blankHoles=()=>Array(18).fill(null);
+let MODE="local", SB=null, syncNote="Saved on this phone only.";
+/* Scoring method and theme come from the address: ?s=stableford | ?s=ambrose, &theme=light */
+const QS=new URLSearchParams(location.search);
+let SCORING=["stroke","stableford","ambrose"].includes(QS.get("s"))?QS.get("s"):"ambrose"; /* the day is Ambrose, so the plain link opens on it */
+/* Viewing a saved past event: PAST holds it, the live board is parked in LIVE_STATE until "Back to live". */
+let PAST=null, LIVE_STATE=null, LIVE_SCORING=null, EVENTS=null;
+const THEME=QS.get("theme")==="light"?"light":"dark";
+if(THEME==="light")document.documentElement.classList.add("light");
+function href(sc,th){const q=new URLSearchParams();if(sc!=="ambrose")q.set("s",sc);if(th==="light")q.set("theme","light");const x=q.toString();return "./"+(x?"?"+x:"")}
+function defaultState(){
+  const st={players:DEFAULT_NAMES.map((n,i)=>({id:"p"+(i+1),name:n,hcp:null,sort:i+1,playing:true,holes:blankHoles()})),teams:[],teamSize:3};
+  if(TEST){ /* phone-only copies start like the real day: AB sitting out, the three real teams */
+    st.players[0].playing=false;
+    st.teams=[["t1","Team 1",["p3","p4","p8"]],["t2","Team 2",["p7","p6","p2"]],["t3","Team 3",["p9","p10","p5"]]].map(([id,name,members],k)=>({id,name,members,sort:k+1,holes:blankHoles()}));
+  }
+  return st;
+}
+function loadLocal(){
+  try{
+    ["wdde-golf-v1","wdde-golf-v2","wdde-golf-v3"].forEach(k=>localStorage.removeItem(k));
+    const raw=localStorage.getItem(STORE_KEY);
+    if(raw){const s=JSON.parse(raw);if(s&&Array.isArray(s.players)){s.players.forEach(p=>{if(!Array.isArray(p.holes)||p.holes.length!==18)p.holes=blankHoles()});s.teams=Array.isArray(s.teams)?s.teams:[];s.teamSize=s.teamSize||3;return s}}
+  }catch(e){}
+  return defaultState();
+}
+function saveLocal(){try{localStorage.setItem(STORE_KEY,JSON.stringify(state))}catch(e){}}
+function liveFailed(msg){MODE="local";syncNote=msg;saveLocal();render()}
+async function fetchAll(){
+  const [pl,sc,tm,ts,st]=await Promise.all([
+    SB.from("players").select("id,name,hcp,sort,playing").order("sort"),
+    SB.from("scores").select("player_id,hole,strokes"),
+    SB.from("teams").select("id,name,members,sort").order("sort"),
+    SB.from("team_scores").select("team_id,hole,strokes"),
+    SB.from("settings").select("key,value")]);
+  if(pl.error||sc.error)throw (pl.error||sc.error);
+  const players=pl.data.map(r=>({id:r.id,name:r.name,hcp:r.hcp==null?null:Number(r.hcp),sort:r.sort,playing:r.playing!==false,holes:blankHoles()}));
+  const by=Object.fromEntries(players.map(p=>[p.id,p]));
+  sc.data.forEach(r=>{const p=by[r.player_id];if(p&&r.hole>=1&&r.hole<=18)p.holes[r.hole-1]=r.strokes});
+  const teams=(tm.data||[]).map(r=>({id:r.id,name:r.name,members:r.members||[],sort:r.sort||0,holes:blankHoles()}));
+  const tby=Object.fromEntries(teams.map(t=>[t.id,t]));
+  (ts.data||[]).forEach(r=>{const t=tby[r.team_id];if(t&&r.hole>=1&&r.hole<=18)t.holes[r.hole-1]=r.strokes});
+  const sz=(st.data||[]).find(r=>r.key==="team_size");
+  return{players,teams,teamSize:sz?(+sz.value||3):3};
+}
+async function startStore(){
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)return;
+  if(!window.supabase){syncNote="Couldn't load the live sync library. Saved on this phone only.";render();return}
+  try{
+    SB=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    const s=await fetchAll();
+    MODE="live";syncNote="Live: scores sync across everyone's phones.";
+    onRemoteChange(s);
+    SB.channel("wdde-golf")
+      .on("postgres_changes",{event:"*",schema:"public",table:"scores"},applyScoreEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"players"},applyPlayerEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"teams"},applyTeamEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"team_scores"},applyTeamScoreEvent)
+      .on("postgres_changes",{event:"*",schema:"public",table:"settings"},applySettingEvent)
+      .subscribe(st=>{if(st==="SUBSCRIBED"){syncNote="Live: scores sync across everyone's phones.";resync()}
+        else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT"){syncNote="Live connection dropped. Retrying… scores still save.";rerender()}});
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)resync()});
+  }catch(e){liveFailed("Can't reach the live board right now. Saved on this phone only.")}
+}
+async function resync(){if(MODE!=="live")return;try{onRemoteChange(await fetchAll())}catch(e){}}
+function applyScoreEvent(ev){if(PAST){LIVE_DIRTY=true;return}
+  const r=ev.eventType==="DELETE"?ev.old:ev.new;const p=state.players.find(x=>x.id===r.player_id);if(!p||!r.hole)return;
+  p.holes[r.hole-1]=ev.eventType==="DELETE"?null:r.strokes;rerender();
+}
+function applyPlayerEvent(ev){if(PAST){LIVE_DIRTY=true;return}
+  if(ev.eventType==="DELETE"){state.players=state.players.filter(p=>p.id!==ev.old.id);rerender();return}
+  const r=ev.new;let p=state.players.find(x=>x.id===r.id);
+  if(!p){p={id:r.id,holes:blankHoles()};state.players.push(p)}
+  p.name=r.name;p.hcp=r.hcp==null?null:Number(r.hcp);p.sort=r.sort;p.playing=r.playing!==false;
+  state.players.sort((a,b)=>(a.sort||0)-(b.sort||0));rerender();
+}
+function applyTeamEvent(ev){if(PAST){LIVE_DIRTY=true;return}
+  if(ev.eventType==="DELETE"){state.teams=state.teams.filter(t=>t.id!==ev.old.id);rerender();return}
+  const r=ev.new;let t=state.teams.find(x=>x.id===r.id);
+  if(!t){t={id:r.id,holes:blankHoles()};state.teams.push(t)}
+  t.name=r.name;t.members=r.members||[];t.sort=r.sort||0;
+  state.teams.sort((a,b)=>(a.sort||0)-(b.sort||0));rerender();
+}
+function applyTeamScoreEvent(ev){if(PAST){LIVE_DIRTY=true;return}
+  const r=ev.eventType==="DELETE"?ev.old:ev.new;const t=state.teams.find(x=>x.id===r.team_id);if(!t||!r.hole)return;
+  t.holes[r.hole-1]=ev.eventType==="DELETE"?null:r.strokes;rerender();
+}
+function applySettingEvent(ev){if(PAST){LIVE_DIRTY=true;return}const r=ev.new;if(ev.eventType!=="DELETE"&&r&&r.key==="team_size"){state.teamSize=+r.value||3;rerender()}}
+const timers={};
+function debounce(key,fn,ms=400){clearTimeout(timers[key]);timers[key]=setTimeout(fn,ms)}
+/* Writes retry until they land (patchy signal on the course). A newer edit to the same box replaces an older pending one. */
+const pending={};
+const LIVE_NOTE="Live: scores sync across everyone's phones.";
+function persist(key,meta,op){
+  const ver=(pending[key]?pending[key].ver:0)+1; pending[key]=Object.assign({ver},meta);
+  (async()=>{
+    for(;;){
+      if(!pending[key]||pending[key].ver!==ver)return;
+      let error=null; try{({error}=await op())}catch(e){error=e}
+      if(!error){
+        if(pending[key]&&pending[key].ver===ver)delete pending[key];
+        if(!Object.keys(pending).length&&!syncNote.startsWith("Live")){syncNote=LIVE_NOTE;rerender()}
+        return;
+      }
+      syncNote="No signal? Your scores are kept on this phone and will send by themselves.";rerender();
+      await new Promise(r=>setTimeout(r,4000));
+    }
+  })();
+}
+function warn(e){if(e){syncNote="Last change didn't reach the live board. Check signal and try again.";rerender()}}
+function savePlayer(p){
+  if(MODE!=="live")return saveLocal();
+  debounce("p"+p.id,()=>persist("p"+p.id,{},()=>SB.from("players").upsert({id:p.id,name:p.name,hcp:p.hcp,sort:p.sort||0,playing:p.playing!==false})));
+}
+function saveHole(p,i){
+  if(MODE!=="live")return saveLocal();
+  debounce("h"+p.id+i,()=>persist("h"+p.id+"-"+i,{pid:p.id,i,get v(){return p.holes[i]}},()=>{
+    const v=p.holes[i];
+    return v==null?SB.from("scores").delete().match({player_id:p.id,hole:i+1})
+      :SB.from("scores").upsert({player_id:p.id,hole:i+1,strokes:v});
+  }),250);
+}
+function saveTeam(t){
+  if(MODE!=="live")return saveLocal();
+  debounce("t"+t.id,()=>persist("t"+t.id,{},()=>SB.from("teams").upsert({id:t.id,name:t.name,members:t.members,sort:t.sort||0})),300);
+}
+function saveTeamHole(t,i){
+  if(MODE!=="live")return saveLocal();
+  debounce("th"+t.id+i,()=>persist("th"+t.id+"-"+i,{tid:t.id,i,get v(){return t.holes[i]}},()=>{
+    const v=t.holes[i];
+    return v==null?SB.from("team_scores").delete().match({team_id:t.id,hole:i+1})
+      :SB.from("team_scores").upsert({team_id:t.id,hole:i+1,strokes:v});
+  }),250);
+}
+function saveSetting(k,v){
+  if(MODE!=="live")return saveLocal();
+  persist("s"+k,{},()=>SB.from("settings").upsert({key:k,value:String(v)}));
+}
+async function addPlayer(p){
+  p.sort=Math.max(0,...state.players.map(x=>x.sort||0))+1;
+  if(MODE!=="live")return saveLocal();
+  const{error}=await SB.from("players").insert({id:p.id,name:p.name,hcp:null,sort:p.sort,playing:true});warn(error);
+}
+async function removePlayerFromStore(id){
+  if(MODE!=="live")return saveLocal();
+  const{error}=await SB.from("players").delete().eq("id",id);warn(error);
+}
+async function clearAllScores(){
+  state.players.forEach(p=>p.holes=blankHoles());state.teams.forEach(t=>t.holes=blankHoles());
+  if(MODE!=="live")return saveLocal();
+  const{error}=await SB.from("scores").delete().gte("hole",1);warn(error);
+  const r2=await SB.from("team_scores").delete().gte("hole",1);warn(r2.error);
+}
+let LIVE_DIRTY=false;
+function onRemoteChange(newState){
+  if(PAST){LIVE_STATE=newState;return}
+  /* keep scores this phone hasn't managed to send yet */
+  Object.values(pending).forEach(m=>{
+    if(m.pid!=null){const p=newState.players.find(x=>x.id===m.pid);if(p)p.holes[m.i]=m.v}
+    if(m.tid!=null){const t=newState.teams.find(x=>x.id===m.tid);if(t)t.holes[m.i]=m.v}});
+  state=newState;rerender()}
+/* ======================= end STORE ======================= */
+
+/* Palmer Colonial — white tees, par 72, 5,774 m */
+const COURSE={name:"Palmer Colonial",tees:"White tees",holes:[
+ [357,4,"Mid-length par 4. A drive in play leaves a mid iron in."],
+ [436,5,"Short par 5. Two solid hits and a wedge gives you a birdie look."],
+ [335,4,"Shorter par 4. Put it in the fairway first; length matters less here."],
+ [145,3,"Short par 3. Take enough club to reach the middle of the green."],
+ [338,4,"Mid-length par 4. A fairway off the tee and a short iron in."],
+ [311,4,"Short par 4. A hybrid or wood off the tee still leaves a wedge."],
+ [129,3,"Shortest hole on the course. Short iron at the fat of the green."],
+ [449,5,"Par 5. Three sensible shots beat one big swing."],
+ [380,4,"Longest par 4 on the front. Bogey is no disaster here."],
+ [336,4,"Mid-length par 4. Fairway first, then a short iron."],
+ [452,5,"Par 5. Lay up to your favourite wedge distance."],
+ [174,3,"Longest par 3. Take plenty of club; missing short is common."],
+ [338,4,"Mid-length par 4. Keep the driver in play and you're attacking."],
+ [306,4,"Shortest par 4. Position off the tee for a full wedge."],
+ [337,4,"Mid-length par 4. Another fairway-and-short-iron hole."],
+ [147,3,"Short par 3. Middle of the green and two putts is a good score."],
+ [484,5,"Longest hole on the course. Three shots, no heroics."],
+ [320,4,"Short closing par 4. Finish with a fairway and a wedge."]
+]};
+const CTP=-1; /* closest-to-the-pin hole, 0-based (e.g. 15 = hole 16); -1 = off, the course runs it on the day */
+const PAR=COURSE.holes.map(h=>h[1]), TOTAL_PAR=PAR.reduce((a,b)=>a+b,0);
+/* Men's stroke index, white tees (1 = hardest). Source: Swing by Swing / GolfPass / mScorecard, checked 10 Oct 2026. */
+const SI=[5,17,7,15,1,9,13,11,3,16,18,2,6,14,4,12,8,10];
+/* Handicap strokes on hole i: a 12 gets one shot on index 1-12; a 20 gets one everywhere plus a second on index 1-2. Handicap rounds to a whole number. */
+function shots(hcp,i){
+  const h=Math.round(hcp||0), n=Math.abs(h), base=Math.floor(n/18), extra=n%18;
+  if(h>=0)return base+(SI[i]<=extra?1:0);
+  return -(base+(SI[i]>18-extra?1:0)); /* plus handicap gives shots back on the easiest holes */
+}
+/* WDDE Club logo — same artwork as the Cup Day form guide */
+const LOGO=`<svg class="logo" viewBox="0 0 300 200" role="img" aria-label="WDDE Club logo">
+  <g class="fig">
+    <circle cx="46" cy="58" r="17"/><rect x="39" y="68" width="14" height="16"/><rect x="16" y="78" width="60" height="116" rx="22"/>
+    <circle cx="98" cy="44" r="17"/><rect x="91" y="54" width="14" height="16"/><rect x="68" y="64" width="60" height="130" rx="22"/>
+    <circle cx="150" cy="32" r="18"/><rect x="143" y="43" width="14" height="16"/><rect x="119" y="53" width="62" height="141" rx="22"/>
+    <circle cx="202" cy="44" r="17"/><rect x="195" y="54" width="14" height="16"/><rect x="172" y="64" width="60" height="130" rx="22"/>
+    <circle cx="254" cy="58" r="17"/><rect x="247" y="68" width="14" height="16"/><rect x="224" y="78" width="60" height="116" rx="22"/>
+  </g>
+  <g class="gap">
+    <path d="M44 194 L46 156 L48 194Z"/><path d="M96 194 L98 156 L100 194Z"/><path d="M148 194 L150 152 L152 194Z"/><path d="M200 194 L202 156 L204 194Z"/><path d="M252 194 L254 156 L256 194Z"/>
+    <path d="M71 194 L72 176 L73 194Z"/><path d="M124 194 L125 172 L126 194Z"/><path d="M175 194 L176 172 L177 194Z"/><path d="M228 194 L229 176 L230 194Z"/>
+  </g>
+  <text class="txt" x="150" y="128" text-anchor="middle" font-size="58" textLength="238" lengthAdjust="spacingAndGlyphs">WDDE Club</text>
+</svg>`;
+
+/* Player headshots: drop a square photo at faces/<player id>.jpg and list the id here. No photo = initials badge. */
+/* Form guide blurbs shown on each player's card (from Steve). */
+const BIOS={
+  p1:"Arrives fit and fresh. Main target is the 19th hole.",
+  p2:"Loves a heavy track. Expect him in the wet.",
+  p3:"Top seed. Hard to beat in a weak field, and this is a very weak field.",
+  p4:"Expect him to be pushing up the leaderboard.",
+  p5:"Sponsored by Just For Men. Chestnut locks in career-best form. Can the golf match?",
+  p6:"Long-time NSW and Bears supporter. Hardened by years of disappointment, could serve him well.",
+  p7:"Running without the aid of the supercomputer, will have to rely on pure skill alone.",
+  p8:"Racing dry this campaign. Untested in these conditions.",
+  p9:"Genuine contender. Scratches if he's let near the rum & sars.",
+  p10:"Nobody can explain it, but he's always at the top of the leaderboard. Stewards are watching."
+};
+const FACES={p1:2,p2:1,p3:1,p4:2,p5:1,p6:1,p7:1,p8:1,p9:1,p10:1};
+function avatar(p,cls=""){
+  const ini=esc((p.name||"?").replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?");
+  return FACES[p.id]?`<img class="av ${cls}" src="../faces/${p.id}.jpg?v=${FACES[p.id]}" alt="">`:`<span class="av ${cls}" aria-hidden="true">${ini}</span>`;
+}
+let state=loadLocal();
+const posMemo={}; /* id -> {pos, mv, at}: places moved at the last change in standings; shown for MOVE_MS */
+const MOVE_MS=120000;
+setInterval(()=>{if(view.name==="board"&&Object.values(posMemo).some(m=>m.mv&&Date.now()-m.at>=MOVE_MS&&!m.gone)){Object.values(posMemo).forEach(m=>{if(m.mv&&Date.now()-m.at>=MOVE_MS)m.gone=true});rerender()}},10000);
+let view={name:"board",id:null,edit:false}, prevOrder=[];
+const $=id=>document.getElementById(id);
+const num=v=>{if(v===""||v==null)return null;const n=parseInt(v,10);return isNaN(n)||n<1?null:Math.min(n,20)};
+const numDec=v=>{if(v===""||v==null)return null;const n=parseFloat(String(v).replace(",","."));return isNaN(n)?null:n};
+const fmt=n=>n==null?"–":(Number.isInteger(n)?String(n):n.toFixed(1));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sum=(a,f,t)=>a.slice(f,t).reduce((s,v)=>s+(v||0),0);
+/* Stableford: net par = 2 points, +1 per shot better, -1 per shot worse, never below 0. */
+function holePts(holes,hcp,i){const v=holes[i];return v==null?null:Math.max(0,2+PAR[i]-(v-shots(hcp,i)))}
+const playingPlayers=()=>state.players.filter(p=>p.playing!==false);
+/* Ambrose team handicap: combined handicaps divided by (2 x players in the team): 2 players /4, 3 players /6, 4 players /8. */
+function teamMembers(t){return (t.members||[]).map(id=>state.players.find(p=>p.id===id)).filter(p=>p&&p.playing!==false)}
+/* Straight Ambrose (Steve, 12 Oct): no team handicap. Set AMBROSE_HCP=true to bring back combined ÷ (2 × players). */
+const AMBROSE_HCP=false;
+function teamHcp(t){if(!AMBROSE_HCP)return 0;const m=teamMembers(t);if(!m.length)return 0;return Math.round(m.reduce((a,p)=>a+(p.hcp||0),0)/(2*m.length)*10)/10}
+function stats(p){return statsFor(p.holes,p.hcp)}
+function statsFor(holes,hcp){
+  const p={holes,hcp};
+  const played=p.holes.map((v,i)=>v!=null?i:-1).filter(i=>i>=0);
+  const gross=played.length?sum(p.holes,0,18):null;
+  const parPlayed=played.reduce((s,i)=>s+PAR[i],0);
+  /* Net to par: handicap strokes are taken on the holes played, by stroke index, as on a real card. */
+  const netExact=gross==null?null:gross-parPlayed-played.reduce((s,i)=>s+shots(p.hcp,i),0);
+  return{thru:played.length,gross,toPar:gross==null?null:gross-parPlayed,netExact,net:netExact==null?null:Math.round(netExact),pts:played.reduce((s,i)=>s+holePts(holes,hcp,i),0)};
+}
+const toParTxt=n=>n==null?"–":n===0?"E":(n>0?"+"+n:String(n));
+const toParCls=n=>n==null||n===0?"":n<0?"under":"over";
+function mark(score,par){
+  if(score==null)return"";const d=score-par;
+  const c=d<=-2?"eagle":d===-1?"birdie":d===1?"bogey":d>=2?"dbl":"";
+  return `<span class="mk ${c}">${score}</span>`;
+}
+
+/* ---------- views ---------- */
+function render(){
+  if(view.name==="card"&&!state.players.find(p=>p.id===view.id))view={name:"board",id:null,edit:false};
+  if(view.name==="team"&&!state.teams.find(t=>t.id===view.id))view={name:"board",id:null,edit:false};
+  if(view.name==="board")renderBoard();else if(view.name==="card")renderCard();else if(view.name==="team")renderTeamCard();else if(view.name==="teams")renderTeams();else if(view.name==="past")renderPastList();else renderSetup();
+}
+const SUN='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg>';
+const RULES={
+  stroke:'Lowest net wins. Net is your score against par after handicap strokes, which you get on the hardest holes (by stroke index, "SI" on each hole), like a normal card. Tap a player to see or enter his card.',
+  stableford:'<b>Stableford.</b> Most points wins. Each hole: net par 2 points, net birdie 3, net bogey 1, worse 0. Handicap shots come on the hardest holes ("SI"). Just type your real score; if you pick up, enter any big number. Tap a player to see or enter his card.',
+  ambrose:'<b>Ambrose.</b> Everyone hits, the team picks the best shot and all play from there. One team score per hole, no handicaps. Lowest score wins. Tap a team to enter its scores.'
+};
+function activeTeams(){return state.teams.filter(t=>teamMembers(t).length).sort((a,b)=>(a.sort||0)-(b.sort||0))}
+function renderBoard(){
+  const amb=SCORING==="ambrose", sf=SCORING==="stableford";
+  const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true,hcpShown:AMBROSE_HCP?teamHcp(t):null},statsFor(t.holes,teamHcp(t))))
+                :playingPlayers().map(p=>Object.assign({p,hcpShown:p.hcp},stats(p)));
+  const key=x=>sf?-x.pts:x.net;
+  const scored=list.filter(x=>x.gross!=null).sort((a,b)=>key(a)-key(b)||(sf?a.thru-b.thru:(a.netExact-b.netExact||b.thru-a.thru)));
+  const rest=list.filter(x=>x.gross==null).sort((a,b)=>amb?(a.p.sort||0)-(b.p.sort||0):a.p.name.localeCompare(b.p.name,"en",{sensitivity:"base"}));
+  let pos=0,last=null;scored.forEach((x,i)=>{if(key(x)!==last){pos=i+1;last=key(x)}x.pos=pos});
+  scored.forEach(x=>x.label=(scored.filter(y=>y.pos===x.pos).length>1?"T":"")+x.pos);
+  if(!PAST)scored.forEach(x=>{const m=posMemo[x.p.id];posMemo[x.p.id]=m&&m.pos!==x.pos?{pos:x.pos,mv:m.pos-x.pos,at:Date.now()}:m?Object.assign(m,{pos:x.pos}):{pos:x.pos,mv:0,at:0}});
+  const all=scored.concat(rest), order=all.map(x=>x.p.id);
+  const who=x=>x.team
+    ?`<span class="tm">${esc(x.p.name||"Team")}<span class="chev">›</span><span class="faces sm">${teamMembers(x.p).map(m=>avatar(m)).join("")}</span><small>${teamMembers(x.p).map(m=>esc(m.name)).join(", ")}</small></span>`
+    :`<span class="nmw">${avatar(x.p)}<span>${esc(x.p.name||"(no name)")}<span class="chev">›</span></span></span>`;
+  const lastCol=x=>sf?(x.gross==null?"–":x.pts):`<span class="${toParCls(x.net)}">${toParTxt(x.net)}</span>`;
+  const other=THEME==="light"?"dark":"light";
+  $("app").innerHTML=`
+  <header>
+    <div class="brand">${LOGO}<div><h1>Palmer Colonial 3-Man Ambrose</h1><p class="tagline">“Where the greens break both ways”</p></div></div>
+    <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="${href(SCORING,other)}" aria-label="Switch to the ${other} version" title="Switch to the ${other} version">${THEME==="light"?MOON:SUN}</a></div>
+    <p>${RULES[SCORING]}</p>
+  </header>
+  ${TEST&&!PREVIEW?`<div class="pastbar"><span><b>TEST VERSION.</b> Scores stay on this phone only. Nothing here touches the real leaderboard.</span><button type="button" id="loadDemo">Load demo round</button></div>`:""}
+  ${PAST?`<div class="pastbar"><span>Past event · <b>${esc(PAST.name)}</b> · ${fmtDate(PAST.played_on)}</span><button type="button" data-closepast>Back to live</button></div>${CAN_DELETE_EVENTS?`<div class="links"><button class="btn sec" type="button" id="delEvent">Delete this event</button></div>`:""}`:""}
+  <section class="board" aria-label="Leaderboard">
+    <div class="board-head"><h2>${amb?"Teams":"Leaderboard"}</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${list.length} started</span></div>
+    ${amb&&!list.length?`<p class="note">No teams yet. Tap <b>Teams</b> below to pick them.</p>`:`<table class="tbl">
+      <thead><tr><th>Pos</th><th>${amb?"Team":"Player"}</th><th>Thru</th><th>Gross</th><th>Hcp</th><th>${sf?"Pts":amb&&!AMBROSE_HCP?"Score":"Net"}</th></tr></thead>
+      <tbody>${all.map((x,i)=>{
+        const empty=x.gross==null, lead=!empty&&x.pos===1, pod=!empty&&x.pos<=3?"p"+x.pos:"", mv=empty||PAST?0:(m=>m&&m.mv&&Date.now()-m.at<MOVE_MS?m.mv:0)(posMemo[x.p.id]), moved=prevOrder.length&&prevOrder.indexOf(x.p.id)!==i&&!empty;
+        return `<tr class="lbrow ${empty?"empty":""} ${lead?"lead":""} ${pod} ${moved?"moved":""}" ${x.team?`data-team="${x.p.id}"`:`data-open="${x.p.id}"`} tabindex="0" role="button" aria-label="Open ${esc(x.p.name)}'s scorecard">
+          <td class="pos">${empty?"–":x.label}${mv>0?`<span class="mv up" aria-label="up ${mv}">▲${mv}</span>`:mv<0?`<span class="mv dn" aria-label="down ${-mv}">▼${-mv}</span>`:""}</td>
+          <td class="nm">${who(x)}</td>
+          <td class="thru">${x.thru===18?"F":x.thru||"–"}</td>
+          <td><span class="${toParCls(x.toPar)}">${fmt(x.gross)}</span></td>
+          <td>${x.hcpShown==null?"–":fmt(x.hcpShown)}</td>
+          <td class="net">${lastCol(x)}</td></tr>`}).join("")}</tbody>
+    </table>`}
+    <div class="board-foot">Thru = holes entered (F = finished). Gross is coloured against par for the holes played.${MODE==="live"&&syncNote.startsWith("Live")?"":`<br><b class="sync ${MODE}">${syncNote}</b>`}</div>
+  </section>
+  ${PAST?`<div class="links"><button class="btn sec" data-go="past" type="button">‹ Past events</button><button class="btn" type="button" data-closepast>Back to live</button></div>
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<button type="button" data-pastmode="${k}" class="${k===SCORING?"on":""}">${l}</button>`).join("")}</nav>`
+  :`<div class="links">${amb?`<button class="btn" data-go="teams" type="button">Teams</button>`:""}<button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
+  <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<a ${k===SCORING?'class="on" aria-current="page"':""} href="${href(k,THEME)}">${l}</a>`).join("")}</nav>
+  <div class="links"><button class="btn sec" data-go="past" type="button">Past events</button><button class="btn dispute" id="dispute" type="button">⚖ Lodge dispute</button></div>${PREVIEW?`<p class="hint" style="text-align:center;margin-top:18px">Preview copy: scores stay on this phone. <button type="button" id="loadDemo" style="background:none;border:0;color:var(--muted);text-decoration:underline">Fill to hole 16</button></p>`:""}`}`;
+  prevOrder=order;
+}
+function renderCard(){renderScorecard(state.players.find(x=>x.id===view.id),false)}
+function renderTeamCard(){renderScorecard(state.teams.find(x=>x.id===view.id),true)}
+function renderScorecard(p,isTeam){
+  const hcp=isTeam?teamHcp(p):p.hcp, holes=p.holes, s=statsFor(holes,hcp), IN=isTeam?"ts":"s";
+  const out=sum(p.holes,0,9), inn=sum(p.holes,9,18);
+  const has=(f,t)=>p.holes.slice(f,t).some(v=>v!=null);
+  const stripRow=(f,t,label)=>`<tr><td>${label}</td>${COURSE.holes.slice(f,t).map((h,i)=>`<td class="s" data-jump="${f+i}">${mark(p.holes[f+i],h[1])||"·"}</td>`).join("")}<td class="tot">${has(f,t)?sum(p.holes,f,t):"–"}</td></tr>`;
+  const strip=(f,t,lab,totLab)=>`<div class="strip-wrap"><table class="strip">
+      <thead><tr><th>${lab}</th>${COURSE.holes.slice(f,t).map((h,i)=>`<th${f+i===CTP?' class="ctp" title="Closest to the pin"':""}>${f+i+1}</th>`).join("")}<th>${totLab}</th></tr></thead>
+      <tbody><tr><td>Par</td>${COURSE.holes.slice(f,t).map(h=>`<td>${h[1]}</td>`).join("")}<td class="tot">${PAR.slice(f,t).reduce((a,b)=>a+b,0)}</td></tr>
+      ${stripRow(f,t,"Score")}${SCORING==="stableford"?`<tr><td>Pts</td>${COURSE.holes.slice(f,t).map((h,i)=>`<td>${holes[f+i]==null?"·":holePts(holes,hcp,f+i)}</td>`).join("")}<td class="tot">${has(f,t)?COURSE.holes.slice(f,t).reduce((a,h,i)=>a+(holePts(holes,hcp,f+i)||0),0):"–"}</td></tr>`:""}</tbody></table></div>`;
+  const holeRow=i=>{const h=COURSE.holes[i];return `<div class="hole${i===CTP?" ctp":""}" id="hole-${i}">
+      <span class="no">${i+1}</span>
+      <span class="info"><b>Par ${h[1]} · ${h[0]} m · SI ${SI[i]}${(n=>n>0?` <span class="shot">+${n} shot${n>1?"s":""}</span>`:"")(shots(hcp,i))}</b><span>${h[2]}</span>${i===CTP?'<span class="ctpb">⛳ Closest to the pin</span>':""}</span>
+      <input ${PAST?"disabled":""} id="${IN}-${p.id}-${i}" ${isTeam?"data-thole":"data-hole"}="${i}" inputmode="numeric" pattern="[0-9]*" placeholder="–" value="${p.holes[i]??""}" aria-label="Hole ${i+1} score"></div>`};
+  $("app").innerHTML=`
+  <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button>
+    ${isTeam?`<span class="faces">${teamMembers(p).map(m=>avatar(m)).join("")}</span><div class="ttl"><h2>${esc(p.name||"Team")}</h2><p class="tform">${teamMembers(p).map(m=>esc(m.name)+(AMBROSE_HCP?" ("+(m.hcp==null?"no hcp":fmt(m.hcp))+")":"")).join(", ")}</p><small>${AMBROSE_HCP?"Team hcp "+fmt(hcp)+" · ":""}${COURSE.tees}</small></div></div>`
+    :`${avatar(p,"lg")}<div class="ttl"><h2>${esc(p.name||"(no name)")}</h2>${BIOS[p.id]?`<p class="tform"><b>Form</b> ${esc(BIOS[p.id])}</p>`:""}<small>Hcp ${p.hcp==null?"not set":fmt(p.hcp)} · ${COURSE.tees}</small></div></div>`}
+  <div class="sum">
+    <div><b>${s.thru===18?"F":s.thru}</b><span>Thru</span></div>
+    <div><b>${fmt(s.gross)}</b><span>Gross</span></div>
+    <div><b class="${toParCls(s.toPar)}">${toParTxt(s.toPar)}</b><span>To par</span></div>
+    ${SCORING==="stableford"?`<div><b>${s.thru?s.pts:"–"}</b><span>Points</span></div>`:`<div><b class="${toParCls(s.net)}">${toParTxt(s.net)}</b><span>Net</span></div>`}
+  </div>
+  ${strip(0,9,"Out","Out")}${strip(9,18,"In","In")}
+  <div class="nine"><h3>Front nine</h3>${[0,1,2,3,4,5,6,7,8].map(holeRow).join("")}
+    <div class="subt"><span>Out (par 36)</span><b>${has(0,9)?out:"–"}</b></div></div>
+  <div class="nine"><h3>Back nine</h3>${[9,10,11,12,13,14,15,16,17].map(holeRow).join("")}
+    <div class="subt"><span>In (par 36)</span><b>${has(9,18)?inn:"–"}</b></div>
+    <div class="subt"><span>Total (par ${TOTAL_PAR})</span><b>${fmt(s.gross)}</b></div></div>
+  <div class="links"><button class="btn sec" data-go="board" type="button">‹ Back to leaderboard</button></div>`;
+}
+function renderSetup(){
+  $("app").innerHTML=`
+  <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Handicaps &amp; players</h2><small>Set before tee-off</small></div></div>
+  <section class="panel">
+    <p class="hint">Enter each player's handicap. Untick <b>Playing</b> to hide someone from the leaderboards without deleting him. Add or remove players here (names are locked). Removing a player deletes his card.</p>
+    ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" readonly value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${inATeam(p.id)?"disabled":""} ${p.playing!==false?"checked":""}>Playing</label><button ${inATeam(p.id)?"disabled":""} class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
+    <form class="add" id="addForm"><input class="name" id="newName" placeholder="Add a player" autocomplete="off"><button class="btn" type="submit">Add</button></form>
+    <h3 class="sect">Finish the day</h3>
+    <p class="hint">Saves today's scores, handicaps and teams to <b>Past events</b>, then clears every scorecard and handicap ready for next time.</p>
+    <input id="evName" value="Palmer Colonial 3-Man Ambrose" aria-label="Event name">
+    ${teamScoring()&&!teamsFinished()?`<p class="note">Available once every Ambrose team has finished all 18 holes, so nobody can wipe the round halfway.</p>`
+      :`<div class="links"><button class="btn sec" id="clearAll" type="button">Save to Past events &amp; clear</button></div>`}
+  </section>`;
+}
+
+/* Once any team has a score, the teams are locked so nobody can reshuffle them, drop a teammate or wipe the board mid-round. */
+const teamScoring=()=>state.teams.some(t=>(t.members||[]).length&&t.holes.some(v=>v!=null));
+const inATeam=pid=>teamScoring()&&state.teams.some(t=>(t.members||[]).includes(pid)&&t.holes.some(v=>v!=null));
+const teamsFinished=()=>{const a=state.teams.filter(t=>(t.members||[]).length&&t.holes.some(v=>v!=null));return a.length>0&&state.teams.filter(t=>teamMembers(t).length).every(t=>t.holes.every(v=>v!=null))};
+function ensureTeams(n){
+  for(let k=1;k<=n;k++){const id="t"+k;if(!state.teams.find(t=>t.id===id)){const t={id,name:"Team "+k,members:[],sort:k,holes:blankHoles()};state.teams.push(t);saveTeam(t)}}
+  state.teams.sort((a,b)=>(a.sort||0)-(b.sort||0));
+}
+function teamCount(){return Math.max(1,Math.ceil(playingPlayers().length/(state.teamSize||3)))}
+/* Even teams: snake draft by handicap (best with worst). Random: shuffle, then deal out. */
+function autoTeams(random){
+  const n=teamCount();ensureTeams(n);
+  let ps=playingPlayers().slice();
+  if(random){for(let i=ps.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ps[i],ps[j]]=[ps[j],ps[i]]}}
+  else ps.sort((a,b)=>(a.hcp??99)-(b.hcp??99));
+  const pick=state.teams.filter(t=>+t.id.slice(1)<=n).sort((a,b)=>a.sort-b.sort);
+  state.teams.forEach(t=>t.members=[]);
+  const best=random?null:bestSplit(ps,n,state.teamSize||3);
+  if(best)best.forEach((g,k)=>g.forEach(p=>pick[k].members.push(p.id)));
+  else ps.forEach((p,i)=>{const r=Math.floor(i/n),c=i%n;pick[random||r%2===0?c:n-1-c].members.push(p.id)});
+  state.teams.forEach(saveTeam);
+}
+/* Try every way to split the players into teams and keep the one whose team handicaps are closest together.
+   Fine for a golf day (9 players = 280 splits); falls back to the snake draft if it would take too long. */
+function bestSplit(ps,n,size){
+  const base=Math.floor(ps.length/n),extra=ps.length%n,sizes=Array.from({length:n},(_,k)=>base+(k<extra?1:0)); /* 9 players in teams of 4 = 3+3+3, not 4+4+1 */
+  if(!base||ps.length>12)return null;
+  const th=g=>g.reduce((a,p)=>a+(p.hcp||0),0)/(2*g.length);
+  let best=null,bestSpread=Infinity,tries=0;
+  const groups=sizes.map(()=>[]);
+  (function place(i){
+    if(++tries>200000)return;
+    if(i===ps.length){const h=groups.map(th),spread=Math.max(...h)-Math.min(...h);if(spread<bestSpread-1e-9){bestSpread=spread;best=groups.map(g=>g.slice())}return}
+    for(let k=0;k<n;k++){
+      if(groups[k].length>=sizes[k])continue;
+      if(groups[k].length===0&&groups.slice(0,k).some(g=>g.length===0&&sizes[groups.indexOf(g)]===sizes[k]))continue; /* skip mirror-image splits */
+      groups[k].push(ps[i]);place(i+1);groups[k].pop();
+    }
+  })(0);
+  return best;
+}
+function assign(pid,tid){
+  state.teams.forEach(t=>{if(t.members.includes(pid)&&t.id!==tid){t.members=t.members.filter(x=>x!==pid);saveTeam(t)}});
+  const t=state.teams.find(x=>x.id===tid);if(t&&!t.members.includes(pid)){t.members.push(pid);saveTeam(t)}
+}
+function renderTeams(){
+  const n=teamCount();ensureTeams(n);
+  const teams=state.teams.filter(t=>+t.id.slice(1)<=n||teamMembers(t).length);
+  const teamOf=pid=>(state.teams.find(t=>t.members.includes(pid))||{}).id||"";
+  $("app").innerHTML=`
+  <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Ambrose teams</h2><small>${playingPlayers().length} playing · ${n} team${n>1?"s":""}</small></div></div>
+  <section class="panel">
+    <h3 class="sect">Players per team</h3>
+    ${teamScoring()?`<p class="note"><b>Teams are locked</b> because scoring has started. You can still rename them.</p>`:""}
+    <div class="seg">${[2,3,4].map(k=>`<button type="button" data-size="${k}" ${teamScoring()?"disabled":""} class="${(state.teamSize||3)===k?"on":""}">${k}</button>`).join("")}</div>
+    <div class="links"><button class="btn" id="autoTeams" type="button" ${teamScoring()?"disabled":""}>Make even teams</button><button class="btn sec" id="randTeams" type="button" ${teamScoring()?"disabled":""}>Randomise</button></div>
+    <p class="hint"><b>Make even teams</b> finds the split where the team handicaps are as close together as possible. <b>Randomise</b> draws them out of a hat. Or pick each player's team below. Team handicaps update by themselves.</p>
+    <h3 class="sect">Teams</h3>
+    ${teams.map(t=>`<div class="tcard"><input class="name" data-tname="${t.id}" value="${esc(t.name)}" aria-label="Team name"><div class="who">${teamMembers(t).map(m=>esc(m.name)).join(", ")||"No players yet"}${AMBROSE_HCP?` · Team hcp <b>${fmt(teamHcp(t))}</b>`:""}</div></div>`).join("")}
+    <h3 class="sect">Who's in which team</h3>
+    ${playingPlayers().map(p=>`<div class="prow assign">${avatar(p)}<span>${esc(p.name)} <small class="hint">(${p.hcp==null?"no hcp":fmt(p.hcp)})</small></span><select ${teamScoring()?"disabled":""} data-assign="${p.id}" aria-label="Team for ${esc(p.name)}"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}" ${teamOf(p.id)===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div>`).join("")}
+  </section>`;
+}
+
+/* ---------- end-of-day finale (test build) ----------
+   When the last outstanding score of the day goes in, that phone reads out third, second and first
+   (with names) in the announcer voice, and every phone shows the final results. */
+const CLIP_BASE=window.WDDE_AUDIO_BASE||((TEST?"":"test/")+"audio/announce/");
+let AC=null; const CLIPS={};
+function audioCtx(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==="suspended")AC.resume();return AC}
+function clip(name){
+  if(!CLIPS[name])CLIPS[name]=fetch(CLIP_BASE+name+".mp3").then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(b=>new Promise((ok,no)=>audioCtx().decodeAudioData(b,ok,no))).catch(()=>null);
+  return CLIPS[name];
+}
+if(END_AUDIO){["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,()=>{if(audioCtx())["intro","third","third_last","second","first","win_team","win_one","and"].forEach(clip)},{passive:true}))}
+const nameClip=n=>"name_"+String(n||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function placeGroups(st){const g=[];st.forEach(x=>{const last=g[g.length-1];if(last&&last[0].pos===x.pos)last.push(x);else g.push([x])});return g}
+function peopleOf(group){return group.flatMap(x=>x.team?teamMembers(x.p).map(m=>m.name):[x.p.name])}
+function namesSeq(people){const out=[];people.forEach((n,i)=>{if(i&&i===people.length-1)out.push("and");out.push(nameClip(n))});return out}
+async function playSeq(list){
+  const ctx=audioCtx();if(!ctx)return;
+  const bufs=await Promise.all(list.map(x=>x==="PAUSE"?null:clip(x)));
+  let t=ctx.currentTime+0.15;
+  list.forEach((x,i)=>{if(x==="PAUSE"){t+=0.5;return}const b=bufs[i];if(!b)return;const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(t);t+=b.duration+0.06});
+}
+function finaleSeq(st){
+  const g=placeGroups(st);if(!g.length)return[];
+  const seq=["intro","PAUSE"];
+  if(g[2]){seq.push(g.length===3?"third_last":"third",...namesSeq(peopleOf(g[2])),"PAUSE")}
+  if(g[1]){seq.push("second",...namesSeq(peopleOf(g[1])),"PAUSE")}
+  const winners=peopleOf(g[0]);
+  seq.push("first",...namesSeq(winners),"PAUSE",winners.length>1?"win_team":"win_one");
+  return seq;
+}
+function fieldDone(){
+  const list=SCORING==="ambrose"?activeTeams():playingPlayers();
+  return list.length>0&&list.every(e=>e.holes.every(v=>v!=null));
+}
+let FINALE_SHOWN=false;
+function finaleCheck(fromInput){
+  if(!END_AUDIO||PAST)return;
+  if(!fieldDone()){FINALE_SHOWN=false;return}
+  if(FINALE_SHOWN)return;
+  FINALE_SHOWN=true;
+  const st=standings(state,SCORING);
+  if(fromInput)playSeq(finaleSeq(st));
+  showFinale(st);
+}
+function showFinale(st){
+  const sf=SCORING==="stableford", g=placeGroups(st).slice(0,3);
+  const label=["1st","2nd","3rd"], blurb=["Rose to the top of the shit heap","Less shit, but still shit","Useless bunch"];
+  const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${blurb[k]} · ${grp[0].gross} gross · ${sf?grp[0].pts+" pts":SCORING==="ambrose"&&!AMBROSE_HCP?toParTxt(grp[0].net):toParTxt(grp[0].net)+" net"}</small></span></div>`;
+  let el=$("finale");if(!el){el=document.createElement("div");el.id="finale";document.body.appendChild(el)}
+  el.innerHTML=`<div class="fin-box"><button class="fin-x" type="button" data-finclose aria-label="Close">×</button>
+    <div class="eyebrow">Palmer Colonial 3-Man Ambrose · Final</div><h2>Final standings</h2>
+    ${g.map(row).join("")}
+    <div class="links"><button class="btn" type="button" data-finplay>▶ Play the call</button><button class="btn sec" type="button" data-finclose>Close</button></div></div>`;
+  el.hidden=false;
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-finclose]")){const el=$("finale");if(el)el.hidden=true;return}
+  if(e.target.closest("[data-finplay]")){audioCtx();playSeq(finaleSeq(standings(state,SCORING)));return}
+  if(e.target.id==="loadDemo"){loadDemo();return}
+});
+/* Test helper: a full pretend day up to hole 16, so the last holes can be played out on a phone. */
+function loadDemo(){
+  const H={p2:18,p3:4,p4:11,p5:6,p6:22,p7:16,p8:25,p9:12,p10:20};
+  let seed=7;const rnd=()=>{seed=(seed*1103515245+12345)%2147483648;return seed/2147483648};
+  const score=(par,hcp)=>{const r=rnd(),d=r<.12?-1:r<.5-hcp*.008?0:r<.82?1:r<.95?2:3;return Math.max(2,par+d)};
+  state.players.forEach(p=>{p.playing=p.id!=="p1";if(H[p.id]!=null)p.hcp=H[p.id];p.holes=blankHoles();if(p.playing)for(let i=0;i<16;i++)p.holes[i]=score(PAR[i],p.hcp||0)});
+  state.teamSize=3;ensureTeams(3);const DAY={t1:["p3","p4","p8"],t2:["p7","p6","p2"],t3:["p9","p10","p5"]}; /* the real teams for 16 Oct */
+  state.teams.forEach(t=>{t.members=DAY[t.id]||[]});
+  state.teams.forEach(t=>{t.holes=blankHoles();if(teamMembers(t).length)for(let i=0;i<16;i++)t.holes[i]=Math.max(2,PAR[i]+(rnd()<.3?-1:rnd()<.8?0:1))});
+  FINALE_SHOWN=false;saveLocal();go("board");
+}
+
+/* ---------- past events ---------- */
+const fmtDate=d=>{try{return new Date(d+"T00:00:00").toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}catch(e){return d}};
+const FORMAT_NAME={stroke:"Stroke play",stableford:"Stableford",ambrose:"Ambrose"};
+function snapshot(){
+  const teamPlayed=state.teams.some(t=>t.holes.some(v=>v!=null));
+  return{players:state.players.map(p=>({id:p.id,name:p.name,hcp:p.hcp,playing:p.playing!==false,sort:p.sort,holes:p.holes.slice()})),
+    teams:state.teams.map(t=>({id:t.id,name:t.name,members:(t.members||[]).slice(),sort:t.sort,holes:t.holes.slice()})),
+    teamSize:state.teamSize||3, scoring:teamPlayed?"ambrose":SCORING};
+}
+async function finishEvent(name){
+  const any=state.players.some(p=>p.holes.some(v=>v!=null))||state.teams.some(t=>t.holes.some(v=>v!=null));
+  if(any){
+    const row={id:"e"+Date.now().toString(36),name,played_on:new Date().toLocaleDateString("en-CA"),data:snapshot()};
+    if(MODE==="live"){
+      let error=null;try{({error}=await SB.from("events").insert(row))}catch(e){error=e}
+      if(error){syncNote="Couldn't save to Past events, so nothing was cleared. Check signal and try again.";EVENTS=null;go("board");return}
+    }else{try{const k=EVENTS_KEY;const a=JSON.parse(localStorage.getItem(k)||"[]");a.unshift(row);localStorage.setItem(k,JSON.stringify(a))}catch(e){}}
+    EVENTS=null;
+  }
+  state.players.forEach(p=>{if(p.hcp!=null){p.hcp=null;savePlayer(p)}});
+  await clearAllScores();
+  go(any?"past":"board");
+}
+async function loadEvents(){
+  if(MODE==="live"){
+    const{data,error}=await SB.from("events").select("id,name,played_on,created_at,data").order("played_on",{ascending:false}).order("created_at",{ascending:false});
+    EVENTS=error?[]:data;
+  }else{try{EVENTS=JSON.parse(localStorage.getItem(EVENTS_KEY)||"[]")}catch(e){EVENTS=[]}}
+  if(view.name==="past")render();
+}
+function standings(st,mode){
+  const s0=state;state=st;
+  try{
+    const amb=mode==="ambrose",sf=mode==="stableford";
+    const list=amb?activeTeams().map(t=>Object.assign({p:t,team:true},statsFor(t.holes,teamHcp(t))))
+                  :playingPlayers().map(p=>Object.assign({p},stats(p)));
+    const out=list.filter(x=>x.gross!=null).sort((a,b)=>sf?(b.pts-a.pts||a.thru-b.thru):(a.net-b.net||a.netExact-b.netExact||b.thru-a.thru));
+    const key=x=>sf?-x.pts:x.net;let pos=0,last=null;out.forEach((x,i)=>{if(key(x)!==last){pos=i+1;last=key(x)}x.pos=pos}); /* ties share a place */
+    return out;
+  }finally{state=s0}
+}
+function renderPastList(){
+  if(EVENTS==null)loadEvents();
+  $("app").innerHTML=`
+  <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Past events</h2><small>Saved when someone taps “Save to Past events &amp; clear”</small></div></div>
+  <section class="panel">
+    ${EVENTS==null?`<p class="note">Loading…</p>`:!EVENTS.length?`<p class="note">No past events yet. At the end of a day, go to <b>Handicaps &amp; players</b> and tap <b>Save to Past events &amp; clear</b>.</p>`
+    :EVENTS.map(ev=>{const m=ev.data.scoring||"stroke",w=standings(ev.data,m)[0];
+      const res=w?`${esc(w.p.name)} (${m==="stableford"?w.pts+" pts":toParTxt(w.net)+" net"})`:"no scores";
+      return `<button class="evcard" type="button" data-event="${ev.id}"><b>${esc(ev.name)}</b><span>${fmtDate(ev.played_on)} · ${FORMAT_NAME[m]}</span><span class="win">Winner: ${res}</span></button>`}).join("")}
+  </section>`;
+}
+function openPast(id){
+  const ev=(EVENTS||[]).find(x=>x.id===id);if(!ev)return;
+  LIVE_STATE=state;LIVE_SCORING=SCORING;PAST=ev;
+  const d=JSON.parse(JSON.stringify(ev.data));d.teams=d.teams||[];d.players.forEach(p=>{p.holes=p.holes||blankHoles()});d.teams.forEach(t=>{t.holes=t.holes||blankHoles()});
+  state=d;SCORING=d.scoring||"stroke";view={name:"board",id:null,edit:false};render();window.scrollTo(0,0);
+}
+async function deletePast(){
+  const id=PAST.id;
+  if(MODE==="live"){const{error}=await SB.from("events").delete().eq("id",id);if(error){syncNote="Couldn't delete that event.";render();return}}
+  else{try{localStorage.setItem(EVENTS_KEY,JSON.stringify((JSON.parse(localStorage.getItem(EVENTS_KEY)||"[]")).filter(e=>e.id!==id)))}catch(e){}}
+  EVENTS=null;go("past");
+}
+function closePast(){
+  if(!PAST)return;
+  state=LIVE_STATE;SCORING=LIVE_SCORING;PAST=null;LIVE_STATE=null;
+  view={name:"board",id:null,edit:false};render();window.scrollTo(0,0);
+  if(LIVE_DIRTY){LIVE_DIRTY=false;resync()}
+}
+
+/* ---------- events ---------- */
+function go(name,id){if(name==="past"&&PAST){state=LIVE_STATE;SCORING=LIVE_SCORING;PAST=null;LIVE_STATE=null;if(LIVE_DIRTY){LIVE_DIRTY=false;resync()}}view={name,id:id||null,edit:false};render();window.scrollTo(0,0)}
+document.addEventListener("click",e=>{
+  const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
+  const o=e.target.closest("[data-open]");if(o){go("card",o.dataset.open);return}
+  const tm=e.target.closest("[data-team]");if(tm){go("team",tm.dataset.team);return}
+  if(e.target.closest("#dispute")){let el=$("ruling");if(!el){el=document.createElement("div");el.id="ruling";el.setAttribute("role","alertdialog");document.body.appendChild(el)}
+    el.innerHTML=`<div class="rul-head">Official ruling</div><div class="rul-body">FUCK OFF, YOU WHINGING CUNT!!</div><div class="rul-foot">Dispute dismissed. Tap anywhere to return.</div>`;el.hidden=false;return}
+  if(e.target.closest("#ruling")){$("ruling").hidden=true;return}
+  if(e.target.closest("[data-closepast]")){closePast();return}
+  if(e.target.id==="delEvent"){const b=e.target;if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to delete for good";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Delete this event"}},3000);return}deletePast();return}
+  const pm=e.target.closest("[data-pastmode]");if(pm){SCORING=pm.dataset.pastmode;render();return}
+  const ev=e.target.closest("[data-event]");if(ev){openPast(ev.dataset.event);return}
+  const sz=e.target.closest("[data-size]");if(sz&&teamScoring())return;if(sz){state.teamSize=+sz.dataset.size;saveSetting("team_size",state.teamSize);render();return}
+  if((e.target.id==="autoTeams"||e.target.id==="randTeams")&&teamScoring())return;
+  if(e.target.id==="autoTeams"){autoTeams(false);render();return}
+  if(e.target.id==="randTeams"){autoTeams(true);render();return}
+  const j=e.target.closest("[data-jump]");if(j){const el=$("hole-"+j.dataset.jump);if(el){el.scrollIntoView({behavior:"smooth",block:"start"});el.querySelector("input").focus({preventScroll:true})}return}
+  const d0=e.target.closest("[data-del]");if(d0&&inATeam(d0.dataset.del))return;
+  const d=e.target.closest("[data-del]");
+  if(d){
+    if(!d.classList.contains("confirm")){d.classList.add("confirm");d.textContent="Remove";setTimeout(()=>{if(d.isConnected){d.classList.remove("confirm");d.textContent="×"}},3000);return}
+    const id=d.dataset.del;state.players=state.players.filter(p=>p.id!==id);removePlayerFromStore(id);render();return}
+  if(e.target.id==="clearAll"&&teamScoring()&&!teamsFinished())return;
+  if(e.target.id==="clearAll"){
+    const b=e.target;
+    if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to save & clear";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Save to Past events & clear"}},3000);return}
+    b.disabled=true;b.textContent="Saving…";finishEvent(($("evName").value||"Golf day").trim());
+  }
+});
+document.addEventListener("keydown",e=>{const o=e.target.closest&&e.target.closest("[data-open],[data-team]");if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();o.dataset.team?go("team",o.dataset.team):go("card",o.dataset.open)}});
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.dataset.assign&&teamScoring()){render();return}
+  if(el.dataset.assign){assign(el.dataset.assign,el.value);render();return}
+  if(el.dataset.play&&inATeam(el.dataset.play)){render();return}
+  if(el.dataset.play){const p=state.players.find(x=>x.id===el.dataset.play);if(p){p.playing=el.checked;savePlayer(p);render()}}
+});
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(PAST)return;
+  if(el.dataset.hole!=null&&view.name==="card"){
+    const p=state.players.find(x=>x.id===view.id),i=+el.dataset.hole;
+    p.holes[i]=num(el.value);saveHole(p,i);
+    finaleCheck(true);
+    if(el.value.length>=1&&p.holes[i]!=null&&p.holes[i]>1&&i<17){const nx=$(`s-${p.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
+    refreshCardNumbers();return;
+  }
+  if(el.dataset.thole!=null&&view.name==="team"){
+    const t=state.teams.find(x=>x.id===view.id),i=+el.dataset.thole;
+    t.holes[i]=num(el.value);saveTeamHole(t,i);
+    finaleCheck(true);
+    if(el.value.length>=1&&t.holes[i]!=null&&t.holes[i]>1&&i<17){const nx=$(`ts-${t.id}-${i+1}`);if(nx&&!nx.value)setTimeout(()=>nx.focus(),50)}
+    rerender();return;
+  }
+  if(el.dataset.tname){const t=state.teams.find(x=>x.id===el.dataset.tname);if(t){t.name=el.value;saveTeam(t)}return}
+  if(el.dataset.play||el.dataset.assign)return;
+  const id=el.dataset.id,f=el.dataset.f;if(!id||!f)return;
+  const p=state.players.find(x=>x.id===id);if(!p)return;
+  p[f]=f==="name"?el.value:numDec(el.value);savePlayer(p);});
+document.addEventListener("submit",e=>{
+  if(e.target.id!=="addForm")return;e.preventDefault();
+  const n=$("newName").value.trim();if(!n)return;
+  const p={id:"p"+Date.now().toString(36),name:n,hcp:null,holes:blankHoles()};
+  state.players.push(p);addPlayer(p);render();$("newName").focus();
+});
+function refreshCardNumbers(){rerender()}
+function rerender(){
+  const a=document.activeElement, id=a&&a.id&&a.tagName==="INPUT"?a.id:null, val=id?a.value:null, y=window.scrollY;
+  render();window.scrollTo(0,y);
+  finaleCheck(false);
+  if(id){const el=$(id);if(el){el.value=val;el.focus({preventScroll:true})}}
+}
+render();startStore();
+</script>
+
+</body></html>

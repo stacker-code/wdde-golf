@@ -214,9 +214,9 @@ const SUPABASE_ANON_KEY="sb_publishable_Xs5Fid2D8rkIvMr6lrC61w_AYP93zy7";
    Nothing outside this block touches storage.
    ============================================================ */
 /* Test build (test/index.html) sets window.WDDE_TEST: phone-only storage, can delete past events, plays the end-of-round voice. */
-const TEST=!!window.WDDE_TEST, CAN_DELETE_EVENTS=TEST, END_AUDIO=TEST;
-const EVENTS_KEY=TEST?"wdde-golf-test-events":"wdde-golf-events";
-const STORE_KEY=TEST?"wdde-golf-test":"wdde-golf-v4";  // v4 = clean slate; older saves are wiped
+const TEST=!!window.WDDE_TEST, PREVIEW=!!window.WDDE_PREVIEW, CAN_DELETE_EVENTS=TEST, END_AUDIO=TEST;
+const EVENTS_KEY=PREVIEW?"wdde-golf-preview-events":TEST?"wdde-golf-test-events":"wdde-golf-events";
+const STORE_KEY=PREVIEW?"wdde-golf-preview":TEST?"wdde-golf-test":"wdde-golf-v4";  // v4 = clean slate; older saves are wiped
 const DEFAULT_NAMES=["AB","Brocky","Don","Gilly","Joey","JT","Locky","Rocket","Shark","Wally"];
 const blankHoles=()=>Array(18).fill(null);
 let MODE="local", SB=null, syncNote="Saved on this phone only.";
@@ -228,7 +228,14 @@ let PAST=null, LIVE_STATE=null, LIVE_SCORING=null, EVENTS=null;
 const THEME=QS.get("theme")==="light"?"light":"dark";
 if(THEME==="light")document.documentElement.classList.add("light");
 function href(sc,th){const q=new URLSearchParams();if(sc!=="ambrose")q.set("s",sc);if(th==="light")q.set("theme","light");const x=q.toString();return "./"+(x?"?"+x:"")}
-function defaultState(){return{players:DEFAULT_NAMES.map((n,i)=>({id:"p"+(i+1),name:n,hcp:null,sort:i+1,playing:true,holes:blankHoles()})),teams:[],teamSize:3}}
+function defaultState(){
+  const st={players:DEFAULT_NAMES.map((n,i)=>({id:"p"+(i+1),name:n,hcp:null,sort:i+1,playing:true,holes:blankHoles()})),teams:[],teamSize:3};
+  if(TEST){ /* phone-only copies start like the real day: AB sitting out, the three real teams */
+    st.players[0].playing=false;
+    st.teams=[["t1","Team 1",["p3","p4","p8"]],["t2","Team 2",["p7","p6","p2"]],["t3","Team 3",["p9","p10","p5"]]].map(([id,name,members],k)=>({id,name,members,sort:k+1,holes:blankHoles()}));
+  }
+  return st;
+}
 function loadLocal(){
   try{
     ["wdde-golf-v1","wdde-golf-v2","wdde-golf-v3"].forEach(k=>localStorage.removeItem(k));
@@ -513,7 +520,7 @@ function renderBoard(){
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="${href(SCORING,other)}" aria-label="Switch to the ${other} version" title="Switch to the ${other} version">${THEME==="light"?MOON:SUN}</a></div>
     <p>${RULES[SCORING]}</p>
   </header>
-  ${TEST?`<div class="pastbar"><span><b>TEST VERSION.</b> Scores stay on this phone only. Nothing here touches the real leaderboard.</span><button type="button" id="loadDemo">Load demo round</button></div>`:""}
+  ${TEST&&!PREVIEW?`<div class="pastbar"><span><b>TEST VERSION.</b> Scores stay on this phone only. Nothing here touches the real leaderboard.</span><button type="button" id="loadDemo">Load demo round</button></div>`:""}
   ${PAST?`<div class="pastbar"><span>Past event · <b>${esc(PAST.name)}</b> · ${fmtDate(PAST.played_on)}</span><button type="button" data-closepast>Back to live</button></div>${CAN_DELETE_EVENTS?`<div class="links"><button class="btn sec" type="button" id="delEvent">Delete this event</button></div>`:""}`:""}
   <section class="board" aria-label="Leaderboard">
     <div class="board-head"><h2>${amb?"Teams":"Leaderboard"}</h2><span>Par ${TOTAL_PAR} · ${scored.length} of ${list.length} started</span></div>
@@ -535,7 +542,7 @@ function renderBoard(){
   <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<button type="button" data-pastmode="${k}" class="${k===SCORING?"on":""}">${l}</button>`).join("")}</nav>`
   :`<div class="links">${amb?`<button class="btn" data-go="teams" type="button">Teams</button>`:""}<button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
   <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<a ${k===SCORING?'class="on" aria-current="page"':""} href="${href(k,THEME)}">${l}</a>`).join("")}</nav>
-  <div class="links"><button class="btn sec" data-go="past" type="button">Past events</button><button class="btn dispute" id="dispute" type="button">⚖ Lodge dispute</button></div>`}`;
+  <div class="links"><button class="btn sec" data-go="past" type="button">Past events</button><button class="btn dispute" id="dispute" type="button">⚖ Lodge dispute</button></div>${PREVIEW?`<p class="hint" style="text-align:center;margin-top:18px">Preview copy: scores stay on this phone. <button type="button" id="loadDemo" style="background:none;border:0;color:var(--muted);text-decoration:underline">Fill to hole 16</button></p>`:""}`}`;
   prevOrder=order;
 }
 function renderCard(){renderScorecard(state.players.find(x=>x.id===view.id),false)}
@@ -653,7 +660,7 @@ function renderTeams(){
 /* ---------- end-of-day finale (test build) ----------
    When the last outstanding score of the day goes in, that phone reads out third, second and first
    (with names) in the announcer voice, and every phone shows the final results. */
-const CLIP_BASE=(TEST?"":"test/")+"audio/announce/";
+const CLIP_BASE=window.WDDE_AUDIO_BASE||((TEST?"":"test/")+"audio/announce/");
 let AC=null; const CLIPS={};
 function audioCtx(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==="suspended")AC.resume();return AC}
 function clip(name){
