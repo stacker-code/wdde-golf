@@ -465,6 +465,7 @@ const playingPlayers=()=>state.players.filter(p=>p.playing!==false);
 function teamMembers(t){return (t.members||[]).map(id=>state.players.find(p=>p.id===id)).filter(p=>p&&p.playing!==false)}
 /* Straight Ambrose (Steve, 12 Oct): no team handicap. Set AMBROSE_HCP=true to bring back combined ÷ (2 × players). */
 const AMBROSE_HCP=false;
+let PIN_MSG="PIN";
 const RESET_PIN="0000"; /* organiser PIN for "Reset round" (Steve chose 0000) */
 function teamHcp(t){if(!AMBROSE_HCP)return 0;const m=teamMembers(t);if(!m.length)return 0;return Math.round(m.reduce((a,p)=>a+(p.hcp||0),0)/(2*m.length)*10)/10}
 function stats(p){return statsFor(p.holes,p.hcp)}
@@ -591,7 +592,7 @@ function renderSetup(){
     <input id="evName" value="Palmer Colonial 3-Man Ambrose" aria-label="Event name">
     <h3 class="sect">Reset the round</h3>
     <p class="hint">Clears every score (teams, players and names stay) without saving it. For wiping test scores before the day. Needs the organiser's PIN.</p>
-    <div class="add"><input id="resetPin" inputmode="numeric" placeholder="PIN" autocomplete="off" aria-label="Reset PIN"><button class="btn sec" id="resetRound" type="button">Reset round</button></div>
+    <div class="add"><input id="resetPin" inputmode="numeric" placeholder="${PIN_MSG}" autocomplete="off" aria-label="Reset PIN"><button class="btn sec" id="resetRound" type="button">Reset round</button></div>
     ${teamScoring()&&!teamsFinished()?`<p class="note">Available once every Ambrose team has finished all 18 holes, so nobody can wipe the round halfway.</p>`
       :`<div class="links"><button class="btn sec" id="clearAll" type="button">Save to Past events &amp; clear</button></div>`}
   </section>`;
@@ -781,7 +782,7 @@ function renderPastList(){
   <section class="panel">
     ${EVENTS==null?`<p class="note">Loading…</p>`:!EVENTS.length?`<p class="note">No past events yet. At the end of a day, go to <b>Handicaps &amp; players</b> and tap <b>Save to Past events &amp; clear</b>.</p>`
     :EVENTS.map(ev=>{const m=ev.data.scoring||"stroke",w=standings(ev.data,m)[0];
-      const res=w?`${esc(w.p.name)} (${m==="stableford"?w.pts+" pts":toParTxt(w.net)+" net"})`:"no scores";
+      const res=w?`${esc(w.p.name)} (${m==="stableford"?w.pts+" pts":m==="ambrose"&&!AMBROSE_HCP?toParTxt(w.net):toParTxt(w.net)+" net"})`:"no scores";
       return `<button class="evcard" type="button" data-event="${ev.id}"><b>${esc(ev.name)}</b><span>${fmtDate(ev.played_on)} · ${FORMAT_NAME[m]}</span><span class="win">Winner: ${res}</span></button>`}).join("")}
   </section>`;
 }
@@ -829,7 +830,8 @@ document.addEventListener("click",e=>{
     const id=d.dataset.del;state.players=state.players.filter(p=>p.id!==id);removePlayerFromStore(id);render();return}
   if(e.target.id==="resetRound"){
     const pin=($("resetPin").value||"").trim();
-    if(pin!==RESET_PIN){$("resetPin").value="";$("resetPin").placeholder="Wrong PIN";return}
+    if(pin!==RESET_PIN){PIN_MSG="Wrong PIN";$("resetPin").value="";$("resetPin").placeholder=PIN_MSG;return}
+    PIN_MSG="PIN";
     const b=e.target;if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to wipe all scores";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Reset round"}},3000);return}
     clearAllScores().then(()=>go("board"));return}
   if(e.target.id==="clearAll"&&teamScoring()&&!teamsFinished())return;
