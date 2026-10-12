@@ -163,6 +163,13 @@ html.light .hole input::placeholder{color:#a3b5ab}
 .prow{grid-template-columns:1fr 4.2rem auto auto}
 .prow.assign{grid-template-columns:auto 1fr auto}
 .links .btn{flex:1}
+.btn.dispute{background:transparent;color:var(--red);border:1px solid var(--red)}
+#ruling{position:fixed;inset:0;z-index:60;background:#b3261e;color:#fff;display:grid;place-content:center;gap:18px;padding:24px;text-align:center;cursor:pointer;animation:rul .25s ease-out}
+#ruling[hidden]{display:none}
+.rul-head{font-family:var(--f-mono);letter-spacing:.2em;text-transform:uppercase;font-size:.85rem;opacity:.85}
+.rul-body{font-family:var(--f-display);font-weight:900;font-size:clamp(2.6rem,13vw,5.5rem);line-height:.95;text-transform:uppercase}
+.rul-foot{font-size:.9rem;opacity:.85}
+@keyframes rul{from{transform:scale(1.15);opacity:0}to{transform:none;opacity:1}}
 button:disabled,select:disabled,input:disabled+*{opacity:.45;cursor:not-allowed}
 #finale{position:fixed;inset:0;z-index:50;background:rgba(5,12,9,.82);display:grid;place-items:center;padding:16px}
 #finale[hidden]{display:none}
@@ -528,7 +535,7 @@ function renderBoard(){
   <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<button type="button" data-pastmode="${k}" class="${k===SCORING?"on":""}">${l}</button>`).join("")}</nav>`
   :`<div class="links">${amb?`<button class="btn" data-go="teams" type="button">Teams</button>`:""}<button class="btn sec" data-go="setup" type="button">Handicaps &amp; players</button></div>
   <nav class="scoring" aria-label="Scoring method"><span>Scoring:</span>${[["stroke","Stroke play"],["stableford","Stableford"],["ambrose","Ambrose"]].map(([k,l])=>`<a ${k===SCORING?'class="on" aria-current="page"':""} href="${href(k,THEME)}">${l}</a>`).join("")}</nav>
-  <div class="links"><button class="btn sec" data-go="past" type="button">Past events</button></div>`}`;
+  <div class="links"><button class="btn sec" data-go="past" type="button">Past events</button><button class="btn dispute" id="dispute" type="button">⚖ Lodge dispute</button></div>`}`;
   prevOrder=order;
 }
 function renderCard(){renderScorecard(state.players.find(x=>x.id===view.id),false)}
@@ -568,8 +575,8 @@ function renderSetup(){
   $("app").innerHTML=`
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Handicaps &amp; players</h2><small>Set before tee-off</small></div></div>
   <section class="panel">
-    <p class="hint">Enter each player's handicap. Untick <b>Playing</b> to hide someone from the leaderboards without deleting him. Rename, add or remove players here. Removing a player deletes his card.</p>
-    ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" data-id="${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${inATeam(p.id)?"disabled":""} ${p.playing!==false?"checked":""}>Playing</label><button ${inATeam(p.id)?"disabled":""} class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
+    <p class="hint">Enter each player's handicap. Untick <b>Playing</b> to hide someone from the leaderboards without deleting him. Add or remove players here (names are locked). Removing a player deletes his card.</p>
+    ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" readonly value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${inATeam(p.id)?"disabled":""} ${p.playing!==false?"checked":""}>Playing</label><button ${inATeam(p.id)?"disabled":""} class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
     <form class="add" id="addForm"><input class="name" id="newName" placeholder="Add a player" autocomplete="off"><button class="btn" type="submit">Add</button></form>
     <h3 class="sect">Finish the day</h3>
     <p class="hint">Saves today's scores, handicaps and teams to <b>Past events</b>, then clears every scorecard and handicap ready for next time.</p>
@@ -792,6 +799,9 @@ document.addEventListener("click",e=>{
   const g=e.target.closest("[data-go]");if(g){go(g.dataset.go);return}
   const o=e.target.closest("[data-open]");if(o){go("card",o.dataset.open);return}
   const tm=e.target.closest("[data-team]");if(tm){go("team",tm.dataset.team);return}
+  if(e.target.closest("#dispute")){let el=$("ruling");if(!el){el=document.createElement("div");el.id="ruling";el.setAttribute("role","alertdialog");document.body.appendChild(el)}
+    el.innerHTML=`<div class="rul-head">Official ruling</div><div class="rul-body">FUCK OFF, YOU WHINGING CUNT!!</div><div class="rul-foot">Dispute dismissed. Tap anywhere to return.</div>`;el.hidden=false;return}
+  if(e.target.closest("#ruling")){$("ruling").hidden=true;return}
   if(e.target.closest("[data-closepast]")){closePast();return}
   if(e.target.id==="delEvent"){const b=e.target;if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to delete for good";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Delete this event"}},3000);return}deletePast();return}
   const pm=e.target.closest("[data-pastmode]");if(pm){SCORING=pm.dataset.pastmode;render();return}
