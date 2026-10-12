@@ -465,7 +465,7 @@ const playingPlayers=()=>state.players.filter(p=>p.playing!==false);
 function teamMembers(t){return (t.members||[]).map(id=>state.players.find(p=>p.id===id)).filter(p=>p&&p.playing!==false)}
 /* Straight Ambrose (Steve, 12 Oct): no team handicap. Set AMBROSE_HCP=true to bring back combined ÷ (2 × players). */
 const AMBROSE_HCP=false;
-const RESET_PIN="1610"; /* organiser PIN for "Reset round" (16/10, the golf day) */
+const RESET_PIN="0000"; /* organiser PIN for "Reset round" (Steve chose 0000) */
 function teamHcp(t){if(!AMBROSE_HCP)return 0;const m=teamMembers(t);if(!m.length)return 0;return Math.round(m.reduce((a,p)=>a+(p.hcp||0),0)/(2*m.length)*10)/10}
 function stats(p){return statsFor(p.holes,p.hcp)}
 function statsFor(holes,hcp){
