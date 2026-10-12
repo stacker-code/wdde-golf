@@ -214,7 +214,7 @@ const SUPABASE_ANON_KEY="sb_publishable_Xs5Fid2D8rkIvMr6lrC61w_AYP93zy7";
    Nothing outside this block touches storage.
    ============================================================ */
 /* Test build (test/index.html) sets window.WDDE_TEST: phone-only storage, can delete past events, plays the end-of-round voice. */
-const TEST=!!window.WDDE_TEST, PREVIEW=!!window.WDDE_PREVIEW, CAN_DELETE_EVENTS=TEST, END_AUDIO=TEST;
+const TEST=!!window.WDDE_TEST, PREVIEW=!!window.WDDE_PREVIEW, CAN_DELETE_EVENTS=TEST, END_AUDIO=false, FINALE_SCREEN=TEST; /* voice call removed 12 Oct (Steve) */
 const EVENTS_KEY=PREVIEW?"wdde-golf-preview-events":TEST?"wdde-golf-test-events":"wdde-golf-events";
 const STORE_KEY=PREVIEW?"wdde-golf-preview":TEST?"wdde-golf-test":"wdde-golf-v4";  // v4 = clean slate; older saves are wiped
 const DEFAULT_NAMES=["AB","Brocky","Don","Gilly","Joey","JT","Locky","Rocket","Shark","Wally"];
@@ -693,12 +693,12 @@ function fieldDone(){
 }
 let FINALE_SHOWN=false;
 function finaleCheck(fromInput){
-  if(!END_AUDIO||PAST)return;
+  if(!FINALE_SCREEN||PAST)return;
   if(!fieldDone()){FINALE_SHOWN=false;return}
   if(FINALE_SHOWN)return;
   FINALE_SHOWN=true;
   const st=standings(state,SCORING);
-  if(fromInput)playSeq(finaleSeq(st));
+  if(fromInput&&END_AUDIO)playSeq(finaleSeq(st));
   showFinale(st);
 }
 function showFinale(st){
@@ -709,7 +709,7 @@ function showFinale(st){
   el.innerHTML=`<div class="fin-box"><button class="fin-x" type="button" data-finclose aria-label="Close">×</button>
     <div class="eyebrow">Palmer Colonial 3-Man Ambrose · Final</div><h2>Final standings</h2>
     ${g.map(row).join("")}
-    <div class="links"><button class="btn" type="button" data-finplay>▶ Play the call</button><button class="btn sec" type="button" data-finclose>Close</button></div></div>`;
+    <div class="links"><button class="btn" type="button" data-finclose>Close</button></div></div>`;
   el.hidden=false;
 }
 document.addEventListener("click",e=>{
