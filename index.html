@@ -163,6 +163,7 @@ html.light .hole input::placeholder{color:#a3b5ab}
 .prow{grid-template-columns:1fr 4.2rem auto auto}
 .prow.assign{grid-template-columns:auto 1fr auto}
 .links .btn{flex:1}
+button:disabled,select:disabled,input:disabled+*{opacity:.45;cursor:not-allowed}
 #finale{position:fixed;inset:0;z-index:50;background:rgba(5,12,9,.82);display:grid;place-items:center;padding:16px}
 #finale[hidden]{display:none}
 .fin-box{position:relative;width:100%;max-width:440px;background:var(--board);border:1px solid var(--flag);border-radius:16px;padding:18px 16px;display:grid;gap:10px}
@@ -568,15 +569,20 @@ function renderSetup(){
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Handicaps &amp; players</h2><small>Set before tee-off</small></div></div>
   <section class="panel">
     <p class="hint">Enter each player's handicap. Untick <b>Playing</b> to hide someone from the leaderboards without deleting him. Rename, add or remove players here. Removing a player deletes his card.</p>
-    ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" data-id="${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${p.playing!==false?"checked":""}>Playing</label><button class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
+    ${state.players.map(p=>`<div class="prow ${p.playing===false?"off":""}"><input class="name" id="n-${p.id}" data-id="${p.id}" data-f="name" value="${esc(p.name)}" aria-label="Player name"><input id="h-${p.id}" data-id="${p.id}" data-f="hcp" inputmode="decimal" placeholder="Hcp" value="${p.hcp??""}" aria-label="Handicap for ${esc(p.name)}"><label class="chk"><input type="checkbox" data-play="${p.id}" ${inATeam(p.id)?"disabled":""} ${p.playing!==false?"checked":""}>Playing</label><button ${inATeam(p.id)?"disabled":""} class="x" data-del="${p.id}" type="button" aria-label="Remove ${esc(p.name)}">×</button></div>`).join("")}
     <form class="add" id="addForm"><input class="name" id="newName" placeholder="Add a player" autocomplete="off"><button class="btn" type="submit">Add</button></form>
     <h3 class="sect">Finish the day</h3>
     <p class="hint">Saves today's scores, handicaps and teams to <b>Past events</b>, then clears every scorecard and handicap ready for next time.</p>
     <input id="evName" value="Palmer Colonial 3-Man Ambrose" aria-label="Event name">
-    <div class="links"><button class="btn sec" id="clearAll" type="button">Save to Past events &amp; clear</button></div>
+    ${teamScoring()&&!teamsFinished()?`<p class="note">Available once every Ambrose team has finished all 18 holes, so nobody can wipe the round halfway.</p>`
+      :`<div class="links"><button class="btn sec" id="clearAll" type="button">Save to Past events &amp; clear</button></div>`}
   </section>`;
 }
 
+/* Once any team has a score, the teams are locked so nobody can reshuffle them, drop a teammate or wipe the board mid-round. */
+const teamScoring=()=>state.teams.some(t=>(t.members||[]).length&&t.holes.some(v=>v!=null));
+const inATeam=pid=>teamScoring()&&state.teams.some(t=>(t.members||[]).includes(pid)&&t.holes.some(v=>v!=null));
+const teamsFinished=()=>{const a=state.teams.filter(t=>(t.members||[]).length&&t.holes.some(v=>v!=null));return a.length>0&&state.teams.filter(t=>teamMembers(t).length).every(t=>t.holes.every(v=>v!=null))};
 function ensureTeams(n){
   for(let k=1;k<=n;k++){const id="t"+k;if(!state.teams.find(t=>t.id===id)){const t={id,name:"Team "+k,members:[],sort:k,holes:blankHoles()};state.teams.push(t);saveTeam(t)}}
   state.teams.sort((a,b)=>(a.sort||0)-(b.sort||0));
@@ -626,13 +632,14 @@ function renderTeams(){
   <div class="bar"><button class="back" data-go="board" type="button">‹ Leaderboard</button><div class="ttl"><h2>Ambrose teams</h2><small>${playingPlayers().length} playing · ${n} team${n>1?"s":""}</small></div></div>
   <section class="panel">
     <h3 class="sect">Players per team</h3>
-    <div class="seg">${[2,3,4].map(k=>`<button type="button" data-size="${k}" class="${(state.teamSize||3)===k?"on":""}">${k}</button>`).join("")}</div>
-    <div class="links"><button class="btn" id="autoTeams" type="button">Make even teams</button><button class="btn sec" id="randTeams" type="button">Randomise</button></div>
+    ${teamScoring()?`<p class="note"><b>Teams are locked</b> because scoring has started. You can still rename them.</p>`:""}
+    <div class="seg">${[2,3,4].map(k=>`<button type="button" data-size="${k}" ${teamScoring()?"disabled":""} class="${(state.teamSize||3)===k?"on":""}">${k}</button>`).join("")}</div>
+    <div class="links"><button class="btn" id="autoTeams" type="button" ${teamScoring()?"disabled":""}>Make even teams</button><button class="btn sec" id="randTeams" type="button" ${teamScoring()?"disabled":""}>Randomise</button></div>
     <p class="hint"><b>Make even teams</b> finds the split where the team handicaps are as close together as possible. <b>Randomise</b> draws them out of a hat. Or pick each player's team below. Team handicaps update by themselves.</p>
     <h3 class="sect">Teams</h3>
     ${teams.map(t=>`<div class="tcard"><input class="name" data-tname="${t.id}" value="${esc(t.name)}" aria-label="Team name"><div class="who">${teamMembers(t).map(m=>esc(m.name)).join(", ")||"No players yet"}${AMBROSE_HCP?` · Team hcp <b>${fmt(teamHcp(t))}</b>`:""}</div></div>`).join("")}
     <h3 class="sect">Who's in which team</h3>
-    ${playingPlayers().map(p=>`<div class="prow assign">${avatar(p)}<span>${esc(p.name)} <small class="hint">(${p.hcp==null?"no hcp":fmt(p.hcp)})</small></span><select data-assign="${p.id}" aria-label="Team for ${esc(p.name)}"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}" ${teamOf(p.id)===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div>`).join("")}
+    ${playingPlayers().map(p=>`<div class="prow assign">${avatar(p)}<span>${esc(p.name)} <small class="hint">(${p.hcp==null?"no hcp":fmt(p.hcp)})</small></span><select ${teamScoring()?"disabled":""} data-assign="${p.id}" aria-label="Team for ${esc(p.name)}"><option value="">No team</option>${teams.map(t=>`<option value="${t.id}" ${teamOf(p.id)===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></div>`).join("")}
   </section>`;
 }
 
@@ -789,14 +796,17 @@ document.addEventListener("click",e=>{
   if(e.target.id==="delEvent"){const b=e.target;if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to delete for good";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Delete this event"}},3000);return}deletePast();return}
   const pm=e.target.closest("[data-pastmode]");if(pm){SCORING=pm.dataset.pastmode;render();return}
   const ev=e.target.closest("[data-event]");if(ev){openPast(ev.dataset.event);return}
-  const sz=e.target.closest("[data-size]");if(sz){state.teamSize=+sz.dataset.size;saveSetting("team_size",state.teamSize);render();return}
+  const sz=e.target.closest("[data-size]");if(sz&&teamScoring())return;if(sz){state.teamSize=+sz.dataset.size;saveSetting("team_size",state.teamSize);render();return}
+  if((e.target.id==="autoTeams"||e.target.id==="randTeams")&&teamScoring())return;
   if(e.target.id==="autoTeams"){autoTeams(false);render();return}
   if(e.target.id==="randTeams"){autoTeams(true);render();return}
   const j=e.target.closest("[data-jump]");if(j){const el=$("hole-"+j.dataset.jump);if(el){el.scrollIntoView({behavior:"smooth",block:"start"});el.querySelector("input").focus({preventScroll:true})}return}
+  const d0=e.target.closest("[data-del]");if(d0&&inATeam(d0.dataset.del))return;
   const d=e.target.closest("[data-del]");
   if(d){
     if(!d.classList.contains("confirm")){d.classList.add("confirm");d.textContent="Remove";setTimeout(()=>{if(d.isConnected){d.classList.remove("confirm");d.textContent="×"}},3000);return}
     const id=d.dataset.del;state.players=state.players.filter(p=>p.id!==id);removePlayerFromStore(id);render();return}
+  if(e.target.id==="clearAll"&&teamScoring()&&!teamsFinished())return;
   if(e.target.id==="clearAll"){
     const b=e.target;
     if(!b.dataset.armed){b.dataset.armed="1";b.className="btn danger";b.textContent="Tap again to save & clear";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.className="btn sec";b.textContent="Save to Past events & clear"}},3000);return}
@@ -806,7 +816,9 @@ document.addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{const o=e.target.closest&&e.target.closest("[data-open],[data-team]");if(o&&(e.key==="Enter"||e.key===" ")){e.preventDefault();o.dataset.team?go("team",o.dataset.team):go("card",o.dataset.open)}});
 document.addEventListener("change",e=>{
   const el=e.target;
+  if(el.dataset.assign&&teamScoring()){render();return}
   if(el.dataset.assign){assign(el.dataset.assign,el.value);render();return}
+  if(el.dataset.play&&inATeam(el.dataset.play)){render();return}
   if(el.dataset.play){const p=state.players.find(x=>x.id===el.dataset.play);if(p){p.playing=el.checked;savePlayer(p);render()}}
 });
 document.addEventListener("input",e=>{
