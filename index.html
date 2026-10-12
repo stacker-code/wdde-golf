@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset=utf8><meta property="og:type" content="website">
-<meta property="og:title" content="Palmer Colonial Classic · WDDE Club">
+<meta property="og:title" content="Palmer Colonial 3-Man Ambrose · WDDE Club">
 <meta property="og:description" content="Where the greens break both ways. Live leaderboard: tap to enter scores.">
-<meta property="og:image" content="https://stacker-code.github.io/wdde-golf/og.jpg">
+<meta property="og:image" content="https://stacker-code.github.io/wdde-golf/og2.jpg">
 <meta property="og:image:width" content="800">
 <meta property="og:image:height" content="420">
 <meta property="og:url" content="https://stacker-code.github.io/wdde-golf/">
@@ -32,7 +32,7 @@ header p{margin:4px 0 0;color:var(--muted);font-size:.88rem}
 .brand{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .brand>div{display:grid;gap:2px;min-width:0}
 header .sub{color:var(--muted)}
-.brand h1{font-size:clamp(1.15rem,5.9vw,2.05rem);line-height:1;white-space:nowrap}
+.brand h1{font-size:clamp(1rem,4.9vw,2rem);line-height:1;white-space:nowrap}
 header .tagline{text-align:center;margin:4px 0 0;font-style:italic;color:var(--flag);font-size:clamp(.9rem,3.6vw,1.05rem)}
 .logo{width:clamp(68px,19vw,104px);height:auto;flex:none;display:block}
 .logo .fig{fill:var(--cream)}
@@ -214,12 +214,12 @@ const blankHoles=()=>Array(18).fill(null);
 let MODE="local", SB=null, syncNote="Saved on this phone only.";
 /* Scoring method and theme come from the address: ?s=stableford | ?s=ambrose, &theme=light */
 const QS=new URLSearchParams(location.search);
-let SCORING=["stableford","ambrose"].includes(QS.get("s"))?QS.get("s"):"stroke";
+let SCORING=["stroke","stableford","ambrose"].includes(QS.get("s"))?QS.get("s"):"ambrose"; /* the day is Ambrose, so the plain link opens on it */
 /* Viewing a saved past event: PAST holds it, the live board is parked in LIVE_STATE until "Back to live". */
 let PAST=null, LIVE_STATE=null, LIVE_SCORING=null, EVENTS=null;
 const THEME=QS.get("theme")==="light"?"light":"dark";
 if(THEME==="light")document.documentElement.classList.add("light");
-function href(sc,th){const q=new URLSearchParams();if(sc!=="stroke")q.set("s",sc);if(th==="light")q.set("theme","light");const x=q.toString();return "./"+(x?"?"+x:"")}
+function href(sc,th){const q=new URLSearchParams();if(sc!=="ambrose")q.set("s",sc);if(th==="light")q.set("theme","light");const x=q.toString();return "./"+(x?"?"+x:"")}
 function defaultState(){return{players:DEFAULT_NAMES.map((n,i)=>({id:"p"+(i+1),name:n,hcp:null,sort:i+1,playing:true,holes:blankHoles()})),teams:[],teamSize:3}}
 function loadLocal(){
   try{
@@ -501,7 +501,7 @@ function renderBoard(){
   const other=THEME==="light"?"dark":"light";
   $("app").innerHTML=`
   <header>
-    <div class="brand">${LOGO}<div><h1>Palmer Colonial Classic</h1><p class="tagline">“Where the greens break both ways”</p></div></div>
+    <div class="brand">${LOGO}<div><h1>Palmer Colonial 3-Man Ambrose</h1><p class="tagline">“Where the greens break both ways”</p></div></div>
     <div class="course"><span class="eyebrow sub">${COURSE.tees} · Par ${TOTAL_PAR} · 5,774 m</span><a class="mode" href="${href(SCORING,other)}" aria-label="Switch to the ${other} version" title="Switch to the ${other} version">${THEME==="light"?MOON:SUN}</a></div>
     <p>${RULES[SCORING]}</p>
   </header>
@@ -572,7 +572,7 @@ function renderSetup(){
     <form class="add" id="addForm"><input class="name" id="newName" placeholder="Add a player" autocomplete="off"><button class="btn" type="submit">Add</button></form>
     <h3 class="sect">Finish the day</h3>
     <p class="hint">Saves today's scores, handicaps and teams to <b>Past events</b>, then clears every scorecard and handicap ready for next time.</p>
-    <input id="evName" value="Palmer Colonial Classic" aria-label="Event name">
+    <input id="evName" value="Palmer Colonial 3-Man Ambrose" aria-label="Event name">
     <div class="links"><button class="btn sec" id="clearAll" type="button">Save to Past events &amp; clear</button></div>
   </section>`;
 }
@@ -686,7 +686,7 @@ function showFinale(st){
   const row=(grp,k)=>`<div class="fin-row fin-${k+1}"><span class="fin-pos">${label[k]}</span><span class="faces">${grp.flatMap(x=>x.team?teamMembers(x.p):[x.p]).map(m=>avatar(m)).join("")}</span><span class="fin-who"><b>${grp.map(x=>esc(x.p.name)).join(" & ")}</b><small>${blurb[k]} · ${grp[0].gross} gross · ${sf?grp[0].pts+" pts":SCORING==="ambrose"&&!AMBROSE_HCP?toParTxt(grp[0].net):toParTxt(grp[0].net)+" net"}</small></span></div>`;
   let el=$("finale");if(!el){el=document.createElement("div");el.id="finale";document.body.appendChild(el)}
   el.innerHTML=`<div class="fin-box"><button class="fin-x" type="button" data-finclose aria-label="Close">×</button>
-    <div class="eyebrow">Palmer Colonial Classic · Final</div><h2>Final standings</h2>
+    <div class="eyebrow">Palmer Colonial 3-Man Ambrose · Final</div><h2>Final standings</h2>
     ${g.map(row).join("")}
     <div class="links"><button class="btn" type="button" data-finplay>▶ Play the call</button><button class="btn sec" type="button" data-finclose>Close</button></div></div>`;
   el.hidden=false;
